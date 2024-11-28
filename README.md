@@ -25,97 +25,88 @@ graph TD;
 Para a construção de gráficos no R, são necessários os conjuntos de dados com informações. Como maneira de se obter essas informações, em especial as de interesse do projeto, é necessário o download dos
 microdados do Sinan. O Datasus oferece um sistema de donwload dos microdados, mas esse opera em software obsoleto. Como maneira de facilitar a obtenção dessa informação, utilizou-se o pacote PySUS, da linguagem
 Python, que permite download de microdados do Sinan.
+
+Suponhamos que se deseje obter os casos de raiva entre 2007 e 2024
 ```jupyter
 pip install PySUS
 import pysus
 from pysus.online_data import SINAN
 from pysus.ftp.databases.sinan import SINAN
 sinan = SINAN().load()
-sinan.diseases #esse comando irá nos fornecer as doenças listadas no Sinan
-```
-Suponhamos que se deseje obter os casos de raiva entre 2010 e 2024
-
-```jupyter
-from pysus.online_data import SINAN
-
-#Primeiro, definimos o intervalo de tempo
-anos = range(2010, 2025)
-
-#Iteramos os arquivos, baixando-os
-for ano in anos:
-    globals()[f'raiv_{ano}'] = sinan.get_files('RAIV', ano)  # Baixar os arquivos ESQU
-    globals()[f'raiv_{ano}'] = sinan.download(globals()[f'raiv_{ano}'])  # Fazer o download
-
+import pandas as pd
+import itertools
+files = [sinan.get_files('RAIV', year) for year in range (2007, 2025)]
+files_flat = list(itertools.chain.from_iterable(files))
+data_dtn = sinan.download(files_flat)
 import pandas as pd
 
-#Armazenamos os arquivos em un dicionário
-dados_raiv = {}
+#Criamos um DataFrame vazio para armazenar os dados finais
+df_final = pd.DataFrame()
 
-#Iteramos pelos anos e lemos os arquivos .parquet
-for ano in anos:
-    nome_arquivo = f'/home/gabrielgraciano/pysus/RAIVBR{str(ano)[-2:]}.parquet' 
-    dados_raiv[ano] = pd.read_parquet(nome_arquivo)
-
-#Verificamos se foi bem sucedido
-print(dados_raiv[2012].head())
-
+for i in range(0, len(files_flat)):
+    print(f"Processando arquivo {i+1}/{len(files_flat)}...")  
+    
+    df_temp = data_dtn[i].to_dataframe()
+    
+    #Selecionamos apenas as colunas de interesse
+    df_temp = df_temp[['NU_ANO', 'SG_UF', 'NU_IDADE_N', 'CS_SEXO', 'CS_RACA', 'CLASSI_FIN']]
+    
+    #Concatenamos o DataFrame temporário ao DataFrame final
+    df_final = pd.concat([df_final, df_temp], ignore_index=True)
+    
+    #Excluímos o DataFrame temporário para liberar memória
+    del df_temp
 ```
 
 Após a seleção dos dados, surge uma etapa complexa, que requer acesso ao dicionário de dados de cada doença: a seleção dos casos suspeitos e confirmados e exclusão dos casos descartados, 
-que muitas vezes são mantidos no banco
+que muitas vezes são mantidos no banco. Em geral, a classificação final encontra-se na coluna 'CLASSI_FIN'
 
 ```jupyter
-#Em geral, a classificação final está na coluna 'CLASSI_FIN'
-for ano in anos:
-    if ano in dados_raiv:  
-        if 'CLASSI_FIN' in dados_raiv[ano].columns:  #Verifica se a coluna existe
-            valores_unicos = dados_raiv[ano]['CLASSI_FIN'].unique()
-            print(f"Ano: {ano}, Valores únicos de 'CLASSI_FIN': {valores_unicos}")
-        else:
-            print(f"Ano: {ano}, 'CLASSI_FIN' não encontrada. Colunas disponíveis: {dados_raiv[ano].columns}")
-    else:
-        print(f"Dados do ano {ano} não estão disponíveis.")
-#Assim, conseguimos obter os valores de classificação final
+df_final['CLASSI_FIN'].value_counts()
 ```
-Uma vez obtidos os valores de classificação final, precisa-se decidir quais serão descartados. Para isso, necessita-se ler os dicionários das doenças. Em geral,
+
+Uma vez obtidos os valores de classificação final, precisa-se decidir quais serão mantidos. Para isso, necessita-se ler os dicionários das doenças. Em geral,
 eles estão disponíveis no Datasus. A versão utilizada deles no presente projeto encontra-se na pasta 'Dicionários' deste repositório.
-
 ```jupyter
+#Filtrando a classificação final
+dados_filtrados = df_final[df_final['CLASSI_FIN'].isin(['1', '8'])]
 
-#Armazenamento dos DataFrames lidos em uma lista para unificação
-df_list = []
-
-#Iteramos pelos anos e unificamos os DataFrames
-for ano in anos:
-    if ano in dados_raiv:  
-        df_list.append(dados_raiv[ano])  #Adiciona o DataFrame do ano na lista
-    else:
-        print(f"Dados do ano {ano} não estão disponíveis.")
-
-#Concatenamos todos os DataFrames em um único DataFrame
-df_unificado = pd.concat(df_list, ignore_index=True)
-
-#Removemos as entradas onde 'CLASSI_FIN' == 2. Esse é um caso específico para a raiva. Esse número varia de doença para doença e necessita ser verificado no dicionário
-
-df_filtrado = df_unificado[df_unificado['CLASSI_FIN'] != '2']
-
-print(df_filtrado['CLASSI_FIN'].unique())
 ```
 
-Em seguida, necessita-se decodificar a idade
-```
+Em seguida, criamos a variável 'idade_anos' a partir da coluna 'NU_IDADE_N'
+```jupyter
 from pysus.preprocessing.decoders import decodifica_idade_SINAN
-df_filtrado['NU_IDADE_N'] = pd.to_numeric(df_filtrado['NU_IDADE_N'], errors = 'coerce')
+# decodifica_idade_SINAN?
 
-# Step 2: Calcular a mediana, ignorando valores NaN
-median_age = df_filtrado['NU_IDADE_N'].median()
+dados_filtrados['NU_IDADE_N'] = pd.to_numeric(dados_filtrados['NU_IDADE_N'], errors='coerce')
+#Removemos as linhas onde 'NU_IDADE_N' contém NaN
+dados_filtrados.dropna(subset=['NU_IDADE_N'], inplace=True)
 
-# Step 3: Substituir os valores NaN pela mediana
-df_filtrado['NU_IDADE_N'].fillna(median_age, inplace=True)
+#Aplicamos a função decodifica_idade_SINAN para criar a coluna 'idade_anos'
+dados_filtrados['idade_anos'] = decodifica_idade_SINAN(dados_filtrados['NU_IDADE_N'], 'Y')
 
-# Step 4: Opcional - Converter para inteiros, se necessário
-# df_concatenado['NU_IDADE_N'] = df_concatenado['NU_IDADE_N'].astype(int)
+dados_filtrados['idade_anos'] = dados_filtrados['idade_anos'].fillna(0).astype(int)
+```
 
-# Verificar o resultado
-print(df_filtrado['NU_IDADE_N'].unique())
+Mudamos os valores das outras colunas a partir dos valores disponibilizados nos dicionários. Essa parte não necessariamente precisa ser feita neste momento. Como maneira de otimização, os dados
+poderiam continuar com valores numéricos e serem inseridos no servidor MySQL, o que facilitaria consultas. A tradução poderia ocorrer posteriormente, otimizando o processo. Criamos, também, a coluna 
+faixa_etaria
+```jupyter
+dados_filtrados['NU_ANO'] = dados_filtrados['NU_ANO'].astype(int)
+dados_filtrados['idade_anos'] = dados_filtrados['idade_anos'].astype(int)
+dados_filtrados['CS_SEXO'] = dados_filtrados['CS_SEXO'].replace(['F', 'M', 'I', ' '], ['Feminino', 'Masculino', 'Ignorado', 'Ignorado'])
+dados_filtrados['CS_RACA'] = dados_filtrados['CS_RACA'].replace(['1', '2', '3', '4', '5', '9'], ['Branca', 'Preta', 'Amarela', 'Parda', 'Indígena', 'Ignorado'])
+dados_filtrados['SG_UF'] = dados_filtrados['SG_UF'].replace(['0', '99', '11', '12', '13', '14', '15', '16', '17', '21', '22', '23', '24', '25', '26', '27', '28', '29', '31', '32', '33', '35', '41', '42', '43', '50', '51', '52', '53', '  '], ['Ignorado', 'Ignorado', 'Rondônia', 'Acre', 'Amazonas', 'Roraima', 'Pará', 'Amapá', 'Tocantins', 'Maranhão', 'Piauí', 'Ceará', 'Rio Grande do Norte', 'Paraíba', 'Pernambuco', 'Alagoas', 'Sergipe', 'Bahia', 'Minas Gerais', 'Espírito Santo', 'Rio de Janeiro', 'São Paulo', 'Paraná', 'Santa Catarina', 'Rio Grande do Sul', 'Mato Grosso do Sul', 'Mato Grosso', 'Goiás', 'Distrito Federal', 'Ignorado'])
+
+bins = [0, 4, 9, 14, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79, 84, 89, 120]  # Faixas de idade
+labels = ['0-4', '5-9', '10-14', '15-19', '20-24', '25-29', '30-34', '35-39', '40-44', '45-49', '50-54', '55-59', '60-64', '65-69', '70-74', '75-79', '80-84', '85-89', '>=90']
+
+#Criando a nova coluna 'faixa_etaria' com pd.cut()
+dados_filtrados['faixa_etaria'] = pd.cut(dados_filtrados['idade_anos'], bins=bins, labels=labels, right=False)
+dados_filtrados['idade_anos'] = dados_filtrados['idade_anos'].fillna(0).astype(int)
+```
+
+Obtemos, por fim, os dados em .csv
+```jupyter
+dados_filtrados.to_csv('casos_raiva_2007_2024.csv', index = False)
 ```
