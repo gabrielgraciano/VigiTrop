@@ -15,9 +15,9 @@ Fluxograma da aplicação:
 
 ```mermaid
 graph TD;
-    ScriptPython-->Dados;
-    Dados-->MySQLserver;
-    MySQLserver-->Shinyapp;
+    Script_Python-->Dados;
+    Dados-->MySQL_server;
+    MySQL_server-->'Shiny app';
 ```
 
 
