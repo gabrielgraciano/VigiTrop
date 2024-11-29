@@ -118,5 +118,5 @@ No futuro, espera-se que tornemos o banco de dados utilizado mais otimizado.
 
 Após a criação do banco de dados, criamos o aplicativo em Shiny que se conectará via biblioteca 'RMySQL' ao servidor MySQL e exibirá os gráficos e análises selecionadas pelo usuário.
 
-###Comentários
+#### Comentários
 O projeto encontra-se em estágio inicial de desenvolvimento. Reconheço que muitos processos podem ser otimizados, facilitados e simplificados e me coloco à disposição para eventuais comentários, críticas ou sugestões através do email gabriel.graciano@unifesp.br
