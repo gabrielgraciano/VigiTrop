@@ -13,11 +13,18 @@
 # `filtro`      recorte do arquivo antes de tudo (ex.: só acidentes com serpente).
 # `definicoes`  nome -> expressão booleana. `confirmado` é obrigatória.
 #               `provavel` só existe onde a distinção faz sentido.
+#               `legado_tcc` reproduz a regra do TCC, para validação.
 #
 # STATUS: regras escritas a partir dos dicionários do SINAN (embutidos no
-# PySUS 2.11.7) e do handoff. Ainda NÃO validadas contra os dados reais nem
-# contra o dump do MySQL. O comando `inspecionar` mostra as distribuições
-# dessas colunas para conferir.
+# PySUS 2.11.7) e do handoff. RAIV e CHAG conferidas contra os dados reais e a
+# Tabela 1 do TCC; as outras doenças ainda não. O comando `inspecionar` mostra
+# as distribuições dessas colunas para conferir.
+#
+# Dados reais (catálogo do PySUS, 01/11/2026): TODAS as colunas vêm como
+# VARCHAR, inclusive NU_ANO e SG_UF (código IBGE: '35'); datas vêm como
+# 'AAAAMMDD'; CLASSI_FIN já vem sem espaço sobrando, mas há '' (vazio).
+# CLASSI_FIN 8 (inconclusivo) aparece em RAIV e CHAG, embora não esteja
+# no dicionário.
 
 ano_inicio: 2007
 
@@ -74,10 +81,14 @@ doencas:
     tabela_legada: chagas
     definicoes:
       confirmado: "CLASSI_FIN = '1'"
-      provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN <> '2'"
+      # Regra do TCC, reconstruída: confirmado + inconclusivo (8). Bate com a
+      # Tabela 1 em 2010, 2015, 2020 e 2022 (verificado em 01/11/2026).
+      legado_tcc: "CLASSI_FIN IN ('1','8')"
     notas: >
       O arquivo CHAG do SINAN é só de doença de Chagas AGUDA. O app antigo
-      dizia apenas "Doença de Chagas".
+      dizia apenas "Doença de Chagas". De 2007 a 2011 o arquivo só traz
+      confirmados (CLASSI_FIN = 1 em todas as linhas); de 2012 em diante traz
+      também suspeitos e descartados.
 
   esquistossomose:
     codigo: ESQU
@@ -149,9 +160,11 @@ doencas:
     tabela_legada: raiva_humana
     definicoes:
       confirmado: "CLASSI_FIN = '1'"
-      provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN <> '2'"
+      # Regra do TCC, reconstruída: confirmado + inconclusivo (8), como no
+      # README antigo. Bate com a Tabela 1 em 2010, 2015 e 2020 (verificado em
+      # 01/11/2026). Infla a raiva em 10 a 20 vezes: em 2018, 66 contra 11
+      # confirmados.
+      legado_tcc: "CLASSI_FIN IN ('1','8')"
     notas: >
-      Contagens minúsculas (incidência na casa de 0,0x por 100 mil). Talvez
-      mostrar casos em vez de taxa. O README antigo (exemplo com raiva) filtrava
-      CLASSI_FIN IN ('1','8') e DESCARTAVA linhas sem NU_IDADE_N. Se o banco
-      antigo seguiu isso, as contagens legadas ficam abaixo do total real.
+      Confirmados: de 1 a 11 por ano. Mostrar casos, não taxa. O README antigo
+      também descartava linhas sem NU_IDADE_N.

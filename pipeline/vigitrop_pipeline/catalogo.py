@@ -13,8 +13,9 @@ from __future__ import annotations
 import asyncio
 import csv
 import logging
+import re
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -57,9 +58,8 @@ class ArquivoRemoto:
     remoto: Any = field(repr=False, compare=False, default=None)
 
     def linha(self) -> dict[str, Any]:
-        d = asdict(self)
-        d.pop("remoto")
-        return d
+        # Sem asdict(): ele faria deepcopy do objeto do PySUS em `remoto`.
+        return {f.name: getattr(self, f.name) for f in fields(self) if f.name != "remoto"}
 
 
 def status_pelo_caminho(caminho_origem: str | None) -> str:
@@ -84,19 +84,40 @@ def _cliente():
     return PySUS()
 
 
+_NOME_SINAN = re.compile(r"^([A-Z]+)BR\d{2}$")
+
+
+def codigo_do_arquivo(grupo: str | None, basename: str) -> str | None:
+    """Código do agravo: grupo do catálogo ou, se faltar, o prefixo do nome do arquivo.
+
+    O catálogo tem arquivos sem grupo (ex.: ESQUBR10, group_id NULL em 01/11/2026),
+    que somem de uma consulta filtrada por grupo.
+    """
+    if grupo:
+        return grupo.upper()
+    m = _NOME_SINAN.match(basename.split(".")[0].upper())
+    if not m:
+        return None
+    prefixo = m.group(1)
+    return "LEIV" if prefixo == "LEI" else prefixo  # LEIBR22: nome errado na origem
+
+
 async def _consultar(cli, doencas: list[Doenca], anos: list[int] | None, ano_inicio: int) -> list[ArquivoRemoto]:
     por_codigo = {d.codigo: d for d in doencas}
-    remotos = await cli.query(client="FTP", dataset="sinan", group=list(por_codigo), year=anos)
+    # Sem filtro de grupo de propósito: ver codigo_do_arquivo().
+    remotos = await cli.query(client="FTP", dataset="sinan", year=anos)
 
     escolhidos: dict[tuple[str, int], ArquivoRemoto] = {}
     for f in remotos:
         rec = f.record
-        grupo = getattr(getattr(rec, "group", None), "name", None) or f.basename[:4]
-        codigo = grupo.upper()
+        grupo = getattr(getattr(rec, "group", None), "name", None)
+        codigo = codigo_do_arquivo(grupo, f.basename)
         if codigo not in por_codigo or rec.year is None:
             continue
         if anos is None and rec.year < ano_inicio:
             continue
+        if grupo is None:
+            log.warning("Arquivo sem grupo no catálogo, identificado pelo nome: %s -> %s", f.basename, codigo)
         a = ArquivoRemoto(
             doenca=por_codigo[codigo].slug,
             codigo=codigo,

@@ -51,6 +51,14 @@ def _parser() -> argparse.ArgumentParser:
     return p
 
 
+def _erro_de_rede(e: BaseException | None) -> bool:
+    while e is not None:
+        if isinstance(e, OSError) or type(e).__module__.split(".")[0] in ("httpx", "httpcore", "botocore", "aioftp"):
+            return True
+        e = e.__cause__ or e.__context__
+    return False
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     cfg = carregar(args.config)
@@ -75,9 +83,9 @@ def main(argv: list[str] | None = None) -> int:
             inspecionar(pastas, doencas, args.anos)
     except SystemExit:
         raise
-    except Exception:
+    except Exception as e:
         log.exception("Falhou. Log completo em %s", arquivo_log)
-        if args.comando in ("listar", "baixar"):
+        if args.comando in ("listar", "baixar") and _erro_de_rede(e):
             log.error("Se o erro for de rede/proxy: o catálogo do PySUS fica em "
                       "https://nbg1.your-objectstorage.com/pysus/ (precisa de HTTPS liberado para esse host).")
         return 1
