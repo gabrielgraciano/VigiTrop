@@ -14,6 +14,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+# O catálogo do PySUS usa a extensão `ducklake` do DuckDB. Instalada no build,
+# ela fica na imagem: o container não precisa baixá-la a cada execução.
+RUN python -c "import duckdb; duckdb.execute('INSTALL ducklake'); duckdb.execute('LOAD ducklake')"
+
 COPY config/ config/
 COPY vigitrop_pipeline/ vigitrop_pipeline/
 
