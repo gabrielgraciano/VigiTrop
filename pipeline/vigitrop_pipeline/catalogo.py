@@ -202,6 +202,23 @@ def _sha256(caminho: Path) -> str:
     return h.hexdigest()
 
 
+TENTATIVAS = 4
+
+
+async def _baixar_com_retentativas(cli, a: ArquivoRemoto):
+    """O espelho às vezes fecha a conexão no meio de arquivos grandes
+    (DENGBR24, 165 MB, cortado aos 79 MB em 01/11/2026). Tenta de novo, com espera crescente."""
+    for tentativa in range(1, TENTATIVAS + 1):
+        try:
+            return await cli.download(a.remoto)
+        except Exception as e:  # DownloadError do PySUS envolve o erro de rede
+            if tentativa == TENTATIVAS:
+                raise
+            espera = 5 * 3 ** (tentativa - 1)  # 5 s, 15 s, 45 s
+            log.warning("    falhou (%s: %s); tentativa %d/%d em %d s", type(e).__name__, str(e).splitlines()[0][:120], tentativa + 1, TENTATIVAS, espera)
+            await asyncio.sleep(espera)
+
+
 def baixar(pastas: Pastas, doencas: list[Doenca], anos: list[int] | None, ano_inicio: int) -> None:
     import pyarrow.parquet as pq
 
@@ -221,7 +238,7 @@ def baixar(pastas: Pastas, doencas: list[Doenca], anos: list[int] | None, ano_in
                 log.warning("Nada a baixar para %s", [d.codigo for d in doencas])
             for i, a in enumerate(arquivos, 1):
                 log.info("[%d/%d] %s %s (%s, %.1f MB, %s linhas)", i, len(arquivos), a.codigo, a.ano, a.status, a.bytes / 1e6, _fmt(a.linhas))
-                local = await cli.download(a.remoto)
+                local = await _baixar_com_retentativas(cli, a)
                 caminho = Path(local.path)
 
                 # Arquivo truncado/corrompido não abre: aí sim é erro.
