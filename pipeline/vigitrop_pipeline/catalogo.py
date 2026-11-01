@@ -215,7 +215,10 @@ async def _baixar_com_retentativas(cli, a: ArquivoRemoto):
             if tentativa == TENTATIVAS:
                 raise
             espera = 5 * 3 ** (tentativa - 1)  # 5 s, 15 s, 45 s
-            log.warning("    falhou (%s: %s); tentativa %d/%d em %d s", type(e).__name__, str(e).splitlines()[0][:120], tentativa + 1, TENTATIVAS, espera)
+            causa: BaseException = e
+            while causa.__cause__ is not None:  # o DownloadError do PySUS embrulha o erro real
+                causa = causa.__cause__
+            log.warning("    falhou (%s: %s); tentativa %d/%d em %d s", type(causa).__name__, str(causa)[:160], tentativa + 1, TENTATIVAS, espera)
             await asyncio.sleep(espera)
 
 

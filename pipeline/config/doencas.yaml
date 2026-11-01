@@ -16,8 +16,8 @@
 #               `legado_tcc` reproduz a regra do TCC, para validação.
 #
 # STATUS: regras escritas a partir dos dicionários do SINAN (embutidos no
-# PySUS 2.11.7) e do handoff. RAIV e CHAG conferidas contra os dados reais e a
-# Tabela 1 do TCC; as outras doenças ainda não. O comando `inspecionar` mostra
+# PySUS 2.11.7) e do handoff. Todas conferidas contra a Tabela 1 do TCC nos
+# anos com população conhecida (2010, 2015, 2020, 2022, 2024), em 01/11/2026. O comando `inspecionar` mostra
 # as distribuições dessas colunas para conferir.
 #
 # Dados reais (catálogo do PySUS, 01/11/2026): TODAS as colunas vêm como
@@ -56,13 +56,20 @@ doencas:
     nome: Dengue
     tabela_legada: dengue
     definicoes:
-      # TCC: só confirmados. Classificação antiga (até 2013): 1 clássico,
-      # 2 com complicações, 3 FHD, 4 SCD. Nova (2014+): 10 dengue,
-      # 11 com sinais de alarme, 12 grave. Em 2014 aparecem as duas.
+      # Classificação antiga (até 2013): 1 clássico, 2 com complicações,
+      # 3 FHD, 4 SCD. Nova (2014+): 10 dengue, 11 com sinais de alarme,
+      # 12 grave. Em 2014 aparecem as duas.
       confirmado: "CLASSI_FIN IN ('1','2','3','4','10','11','12')"
       # Ministério da Saúde: notificados menos descartados (5).
       # 13 = classificado como chikungunya: também sai.
       provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN NOT IN ('5','13')"
+      # TCC: todas as linhas do arquivo. 2010: 515,70 aqui contra 513,17 na
+      # Tabela 1, enquanto os confirmados dão 446. A diferença bate com as
+      # revisões que o DataSUS fez nos arquivos em 2026.
+      legado_tcc: "TRUE"
+    notas: >
+      Os arquivos do DataSUS já vêm SEM os descartados (não há CLASSI_FIN 5),
+      então "provável" é praticamente o arquivo inteiro.
 
   chikungunya:
     codigo: CHIK
@@ -71,9 +78,13 @@ doencas:
     definicoes:
       confirmado: "CLASSI_FIN = '13'"
       provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN NOT IN ('5','10','11','12')"
+      # TCC, aproximado: em 2022, 70,47 aqui contra 70,58 na Tabela 1. Os
+      # arquivos foram revisados em 2026, então não dá para conferir exato.
+      legado_tcc: "CLASSI_FIN = '13'"
     notas: >
-      Regra do pipeline antigo desconhecida (não há notebook). Comparar as duas
-      definições com notifications_chikungunya do dump.
+      PENDENTE: 2015 usa outra codificação (CLASSI_FIN 1, 2 e 8, e quase
+      nenhum 13), então "confirmado" sai quase zerado nesse ano. Conferir no
+      dicionário da época.
 
   chagas:
     codigo: CHAG
@@ -97,6 +108,7 @@ doencas:
     colunas_codigo_extras: [FORMA, TPAUTOCTO]
     definicoes:
       # A ficha não tem CLASSI_FIN: notificação exige exame positivo.
+      # Igual ao TCC: bate exato com a Tabela 1 em 2010, 2015 e 2020.
       confirmado: "TRUE"
     notas: >
       Em área endêmica os casos de rotina vão para o SISPCE, não para o SINAN.
@@ -110,9 +122,12 @@ doencas:
     colunas_data_extras: [DT_DIAG]
     definicoes:
       # Indicador oficial: casos novos (MODOENTR 1), sem "erro diagnóstico"
-      # na saída (TPALTA_N 8). Indício forte de que o TCC NÃO aplicou esse
-      # filtro (ver handoff, seção 8): comparar com o total de notificações.
+      # na saída (TPALTA_N 8). 2019: 28.337 aqui; o Ministério divulga ~27,9 mil.
       confirmado: "MODOENTR = '1' AND (TPALTA_N IS NULL OR TPALTA_N <> '8')"
+      # TCC: todas as notificações, sem filtro de caso novo. Bate exato com a
+      # Tabela 1 em 2010, 2015 e 2020. Infla a detecção em ~30% (2019:
+      # 36.626 contra 28.337).
+      legado_tcc: "TRUE"
     notas: >
       O Ministério da Saúde usa o ano de diagnóstico (DT_DIAG).
 
@@ -124,6 +139,9 @@ doencas:
     definicoes:
       confirmado: "CLASSI_FIN = '1'"
       provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN <> '2'"
+      # TCC: confirmado + inconclusivo (8). Bate exato com a Tabela 1 em
+      # 2010, 2015, 2020 e 2022.
+      legado_tcc: "CLASSI_FIN IN ('1','8')"
     notas: >
       ENTRADA: 1 caso novo, 2 recidiva, 3 transferência. Decidir se
       transferências saem da contagem (evita contar o mesmo caso duas vezes).
@@ -135,6 +153,7 @@ doencas:
     colunas_codigo_extras: [CLA_TIPO_N, CLAS_FORMA]
     definicoes:
       # A ficha não tem CLASSI_FIN: só casos confirmados são notificados.
+      # Igual ao TCC: bate exato com a Tabela 1 em 2010, 2015, 2020 e 2022.
       confirmado: "TRUE"
     notas: >
       CLA_TIPO_N: 1 caso novo, 2 recidiva, 3 transferência. Mesma decisão
@@ -149,10 +168,14 @@ doencas:
     filtro: "TP_ACIDENT = '1'"
     definicoes:
       confirmado: "TRUE"
+      # TCC, aproximado: só serpentes peçonhentas de tipo conhecido
+      # (botrópico, crotálico, elapídico, laquético). Fica a ±3% da Tabela 1;
+      # os arquivos foram revisados em 2025 e 2026.
+      legado_tcc: "ANI_SERPEN IN ('1','2','3','4')"
     notas: >
-      ANI_SERPEN 5 = serpente não peçonhenta. A rigor não é envenenamento;
-      decidir se sai. Conferir também qual critério o banco antigo usou
-      (TP_ACIDENT = 1 ou ANI_SERPEN preenchido).
+      DECIDIR: ANI_SERPEN 5 = não peçonhenta; 9 = tipo ignorado. Em 2010:
+      todas as serpentes 15,41/100 mil; sem as não peçonhentas 14,79;
+      só peçonhentas de tipo conhecido 13,09.
 
   raiva_humana:
     codigo: RAIV
