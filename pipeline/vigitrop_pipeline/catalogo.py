@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import hashlib
 import logging
 import re
 import sys
@@ -39,7 +40,10 @@ COLUNAS_MANIFESTO = [
     "modificado_origem",
     "modificado_catalogo",
     "data_coleta",
+    "aviso",
 ]
+# No manifesto, bytes/linhas/sha256 são do arquivo BAIXADO (a verdade que o
+# pipeline usa). Os valores que o catálogo anuncia ficam em relatorios/catalogo.csv.
 
 
 @dataclass
@@ -185,51 +189,84 @@ def listar(pastas: Pastas, doencas: list[Doenca], anos: list[int] | None, ano_in
             f"  ?: {_faixas(outros)}" if outros else "",
         )
     destino = pastas.relatorios / "catalogo.csv"
-    _escrever_csv(destino, [c for c in COLUNAS_MANIFESTO if c not in ("arquivo_local", "data_coleta")], [a.linha() for a in arquivos])
+    _escrever_csv(destino, [c for c in COLUNAS_MANIFESTO if c not in ("arquivo_local", "data_coleta", "aviso")], [a.linha() for a in arquivos])
     log.info("Lista completa em %s", destino)
     return arquivos
 
 
+def _sha256(caminho: Path) -> str:
+    h = hashlib.sha256()
+    with caminho.open("rb") as fh:
+        for bloco in iter(lambda: fh.read(1 << 20), b""):
+            h.update(bloco)
+    return h.hexdigest()
+
+
 def baixar(pastas: Pastas, doencas: list[Doenca], anos: list[int] | None, ano_inicio: int) -> None:
+    import pyarrow.parquet as pq
+
     antigos = {(r["codigo"], int(r["ano"])): r for r in ler_manifesto(pastas)}
+    todas = dict(antigos)
     agora = datetime.now().isoformat(timespec="seconds")
 
-    async def _run() -> list[dict[str, Any]]:
-        novas: list[dict[str, Any]] = []
+    def gravar() -> None:
+        ordenadas = sorted(todas.values(), key=lambda r: (r["doenca"], int(r["ano"])))
+        _escrever_csv(pastas.manifesto, COLUNAS_MANIFESTO, ordenadas)
+
+    async def _run() -> int:
+        avisos = 0
         async with _cliente() as cli:
             arquivos = await _consultar(cli, doencas, anos, ano_inicio)
             if not arquivos:
                 log.warning("Nada a baixar para %s", [d.codigo for d in doencas])
             for i, a in enumerate(arquivos, 1):
-                log.info("[%d/%d] %s %s (%s, %.1f MB, %s linhas)", i, len(arquivos), a.codigo, a.ano, a.status, a.bytes / 1e6, f"{a.linhas:,}".replace(",", "."))
+                log.info("[%d/%d] %s %s (%s, %.1f MB, %s linhas)", i, len(arquivos), a.codigo, a.ano, a.status, a.bytes / 1e6, _fmt(a.linhas))
                 local = await cli.download(a.remoto)
                 caminho = Path(local.path)
-                if not await a.remoto.verify(caminho):
-                    raise RuntimeError(f"sha256 não confere: {caminho}")
+
+                # Arquivo truncado/corrompido não abre: aí sim é erro.
+                linhas = pq.ParquetFile(caminho).metadata.num_rows
+                tamanho = caminho.stat().st_size
+                sha = _sha256(caminho)
+                aviso = ""
+                if a.sha256 and sha != a.sha256:
+                    # Visto em 01/11/2026: o espelho trocou DENGBR21 (28/09/2026) e o
+                    # catálogo continuou anunciando a versão anterior.
+                    aviso = f"catálogo diverge: anuncia {a.bytes} bytes/{a.linhas} linhas; baixado {tamanho} bytes/{linhas} linhas"
+                    avisos += 1
+                    log.warning("    %s", aviso)
 
                 anterior = antigos.get((a.codigo, a.ano))
-                mesmo = anterior is not None and anterior.get("sha256") == (a.sha256 or "") and anterior.get("bytes") == str(a.bytes)
+                mesmo = anterior is not None and anterior.get("sha256") == sha
                 if anterior is None:
                     log.info("    novo")
                 elif mesmo:
                     log.info("    sem mudança desde %s", anterior["data_coleta"])
                 else:
-                    log.info("    ATUALIZADO (antes: %s, %s)", anterior.get("status"), anterior.get("data_coleta"))
+                    log.info("    ATUALIZADO (antes: %s, %s linhas, coletado em %s)", anterior.get("status"), anterior.get("linhas"), anterior.get("data_coleta"))
 
                 linha = a.linha()
-                linha["arquivo_local"] = pastas.relativo(caminho)
-                linha["data_coleta"] = anterior["data_coleta"] if mesmo else agora
-                novas.append(linha)
-        return novas
+                linha.update(
+                    arquivo_local=pastas.relativo(caminho),
+                    bytes=tamanho,
+                    linhas=linhas,
+                    sha256=sha,
+                    data_coleta=anterior["data_coleta"] if mesmo else agora,
+                    aviso=aviso,
+                )
+                todas[(a.codigo, a.ano)] = linha
+                gravar()  # a cada arquivo: uma falha no meio não perde o que já baixou
+        return avisos
 
-    novas = asyncio.run(_run())
+    avisos = asyncio.run(_run())
+    gravar()
+    log.info("Manifesto: %s (%d arquivos)", pastas.manifesto, len(todas))
+    if avisos:
+        log.warning("%d arquivo(s) com divergência entre catálogo e arquivo baixado (coluna `aviso` do manifesto)", avisos)
 
-    todas = {(r["codigo"], int(r["ano"])): r for r in antigos.values()}
-    for r in novas:
-        todas[(r["codigo"], int(r["ano"]))] = r
-    ordenadas = sorted(todas.values(), key=lambda r: (r["doenca"], int(r["ano"])))
-    _escrever_csv(pastas.manifesto, COLUNAS_MANIFESTO, ordenadas)
-    log.info("Manifesto: %s (%d arquivos)", pastas.manifesto, len(ordenadas))
+
+def _fmt(n: int) -> str:
+    return f"{n:,}".replace(",", ".")
 
 
 def _faixas(anos: list[int]) -> str:
