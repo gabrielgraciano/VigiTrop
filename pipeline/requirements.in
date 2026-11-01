@@ -1,0 +1,7 @@
+# Dependências diretas. O requirements.txt (travado) é gerado a partir daqui:
+#   docker run --rm -v ${PWD}:/w -w /w python:3.12.16-slim-trixie sh -c \
+#     "pip install -q -r requirements.in && pip freeze > requirements.txt"
+pysus==2.11.7
+duckdb
+pyarrow
+PyYAML

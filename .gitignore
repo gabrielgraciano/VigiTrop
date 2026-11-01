@@ -1,0 +1,35 @@
+# Dados gerados pelo pipeline (cache do PySUS, bronze/silver/gold, logs, relatórios)
+data/
+*.parquet
+*.dbc
+*.dbf
+!shiny/mapas/*.dbf
+
+# Dumps e credenciais: NUNCA commitar
+*.sql
+*.sql.gz
+.env
+*.env
+server_sql.R.local
+.Renviron
+pysus.toml
+.pysus.toml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# R / RStudio
+.Rproj.user/
+.Rhistory
+.RData
+rsconnect/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini

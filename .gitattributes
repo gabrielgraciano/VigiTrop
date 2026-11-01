@@ -1,0 +1,11 @@
+# Tudo em LF: scripts rodam dentro de containers Linux, mesmo com clone no Windows.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.pdf binary
+*.shp binary
+*.shx binary
+*.dbf binary
+*.parquet binary
+*.gz binary

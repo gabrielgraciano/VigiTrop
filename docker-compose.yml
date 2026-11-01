@@ -1,0 +1,24 @@
+# VigiTrop: docker compose do projeto.
+#
+# O nome do projeto é fixo ("vigitrop"), para nunca encostar em outros
+# projetos da VM (Garu etc.). Na VM, mesmo assim, use sempre `-p vigitrop`.
+#
+# Pipeline (roda sob demanda; não sobe com `up`):
+#   docker compose build pipeline
+#   docker compose run --rm pipeline listar
+#   docker compose run --rm pipeline baixar --doencas RAIV CHAG
+#   docker compose run --rm pipeline inspecionar --doencas RAIV CHAG
+#
+# O serviço `app` (Shiny lendo data/gold via DuckDB) entra na fase 2.
+
+name: vigitrop
+
+services:
+  pipeline:
+    build: ./pipeline
+    image: vigitrop-pipeline
+    profiles: ["pipeline"]
+    volumes:
+      - ./data:/data
+    environment:
+      TZ: America/Sao_Paulo

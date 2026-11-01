@@ -1,0 +1,157 @@
+# Configuração das doenças do VigiTrop.
+#
+# Cada doença aponta para um agravo do SINAN (código usado pelo PySUS) e define,
+# em SQL (DuckDB), quais notificações entram em cada definição de caso.
+#
+# As expressões rodam sobre uma visão "normalizada" do arquivo bruto:
+#   - toda coluna listada em `colunas_codigo` (comuns + extras da doença) vira
+#     VARCHAR sem espaços nas pontas; vazio vira NULL.
+#     Ex.: CLASSI_FIN '1 ' -> '1'; CLASSI_FIN 10 (inteiro) -> '10'.
+#   - coluna que não existe no arquivo de um ano entra como NULL.
+# Ou seja: compare sempre com texto ('1', '10'), nunca com número.
+#
+# `filtro`      recorte do arquivo antes de tudo (ex.: só acidentes com serpente).
+# `definicoes`  nome -> expressão booleana. `confirmado` é obrigatória.
+#               `provavel` só existe onde a distinção faz sentido.
+#
+# STATUS: regras escritas a partir dos dicionários do SINAN (embutidos no
+# PySUS 2.11.7) e do handoff. Ainda NÃO validadas contra os dados reais nem
+# contra o dump do MySQL. O comando `inspecionar` mostra as distribuições
+# dessas colunas para conferir.
+
+ano_inicio: 2007
+
+# Colunas da ficha de notificação, presentes (em princípio) em todos os agravos.
+colunas_codigo_comuns:
+  - NU_ANO       # ano da notificação
+  - SEM_NOT      # semana epidemiológica da notificação (AAAASS)
+  - SEM_PRI      # semana epidemiológica dos primeiros sintomas (AAAASS)
+  - SG_UF        # UF de RESIDÊNCIA (código IBGE, 2 dígitos)
+  - SG_UF_NOT    # UF de notificação (não usar para incidência)
+  - ID_MN_RESI   # município de residência
+  - NU_IDADE_N   # idade codificada: 1º dígito = unidade (1 h, 2 d, 3 m, 4 a)
+  - CS_SEXO      # M, F, I
+  - CS_RACA      # 1 branca, 2 preta, 3 amarela, 4 parda, 5 indígena, 9 ign.
+  - CS_GESTANT
+  - CLASSI_FIN
+  - CRITERIO
+  - EVOLUCAO
+
+colunas_data_comuns:
+  - DT_NOTIFIC
+  - DT_SIN_PRI
+  - DT_ENCERRA
+
+doencas:
+
+  dengue:
+    codigo: DENG
+    nome: Dengue
+    tabela_legada: dengue
+    definicoes:
+      # TCC: só confirmados. Classificação antiga (até 2013): 1 clássico,
+      # 2 com complicações, 3 FHD, 4 SCD. Nova (2014+): 10 dengue,
+      # 11 com sinais de alarme, 12 grave. Em 2014 aparecem as duas.
+      confirmado: "CLASSI_FIN IN ('1','2','3','4','10','11','12')"
+      # Ministério da Saúde: notificados menos descartados (5).
+      # 13 = classificado como chikungunya: também sai.
+      provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN NOT IN ('5','13')"
+
+  chikungunya:
+    codigo: CHIK
+    nome: Febre chikungunya
+    tabela_legada: febre_chikungunya
+    definicoes:
+      confirmado: "CLASSI_FIN = '13'"
+      provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN NOT IN ('5','10','11','12')"
+    notas: >
+      Regra do pipeline antigo desconhecida (não há notebook). Comparar as duas
+      definições com notifications_chikungunya do dump.
+
+  chagas:
+    codigo: CHAG
+    nome: Doença de Chagas aguda
+    tabela_legada: chagas
+    definicoes:
+      confirmado: "CLASSI_FIN = '1'"
+      provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN <> '2'"
+    notas: >
+      O arquivo CHAG do SINAN é só de doença de Chagas AGUDA. O app antigo
+      dizia apenas "Doença de Chagas".
+
+  esquistossomose:
+    codigo: ESQU
+    nome: Esquistossomose
+    tabela_legada: esquistossomose
+    colunas_codigo_extras: [FORMA, TPAUTOCTO]
+    definicoes:
+      # A ficha não tem CLASSI_FIN: notificação exige exame positivo.
+      confirmado: "TRUE"
+    notas: >
+      Em área endêmica os casos de rotina vão para o SISPCE, não para o SINAN.
+      A incidência "Brasil" precisa de ressalva explícita no app.
+
+  hanseniase:
+    codigo: HANS
+    nome: Hanseníase
+    tabela_legada: hanseniase
+    colunas_codigo_extras: [MODOENTR, TPALTA_N, CLASSOPERA, FORMACLINI]
+    colunas_data_extras: [DT_DIAG]
+    definicoes:
+      # Indicador oficial: casos novos (MODOENTR 1), sem "erro diagnóstico"
+      # na saída (TPALTA_N 8). Indício forte de que o TCC NÃO aplicou esse
+      # filtro (ver handoff, seção 8): comparar com o total de notificações.
+      confirmado: "MODOENTR = '1' AND (TPALTA_N IS NULL OR TPALTA_N <> '8')"
+    notas: >
+      O Ministério da Saúde usa o ano de diagnóstico (DT_DIAG).
+
+  leishmaniose_visceral:
+    codigo: LEIV
+    nome: Leishmaniose visceral
+    tabela_legada: leishmaniose_visceral
+    colunas_codigo_extras: [ENTRADA]
+    definicoes:
+      confirmado: "CLASSI_FIN = '1'"
+      provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN <> '2'"
+    notas: >
+      ENTRADA: 1 caso novo, 2 recidiva, 3 transferência. Decidir se
+      transferências saem da contagem (evita contar o mesmo caso duas vezes).
+
+  leishmaniose_tegumentar:
+    codigo: LTAN
+    nome: Leishmaniose tegumentar americana
+    tabela_legada: leishmaniose_tegumentar
+    colunas_codigo_extras: [CLA_TIPO_N, CLAS_FORMA]
+    definicoes:
+      # A ficha não tem CLASSI_FIN: só casos confirmados são notificados.
+      confirmado: "TRUE"
+    notas: >
+      CLA_TIPO_N: 1 caso novo, 2 recidiva, 3 transferência. Mesma decisão
+      da leishmaniose visceral.
+
+  envenenamento_serpente:
+    codigo: ANIM
+    nome: Envenenamento por picada de cobra
+    tabela_legada: envenenamento_picada
+    colunas_codigo_extras: [TP_ACIDENT, ANI_SERPEN, TRA_CLASSI]
+    # O arquivo ANIM tem todos os animais peçonhentos: fica só serpente.
+    filtro: "TP_ACIDENT = '1'"
+    definicoes:
+      confirmado: "TRUE"
+    notas: >
+      ANI_SERPEN 5 = serpente não peçonhenta. A rigor não é envenenamento;
+      decidir se sai. Conferir também qual critério o banco antigo usou
+      (TP_ACIDENT = 1 ou ANI_SERPEN preenchido).
+
+  raiva_humana:
+    codigo: RAIV
+    nome: Raiva humana
+    tabela_legada: raiva_humana
+    definicoes:
+      confirmado: "CLASSI_FIN = '1'"
+      provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN <> '2'"
+    notas: >
+      Contagens minúsculas (incidência na casa de 0,0x por 100 mil). Talvez
+      mostrar casos em vez de taxa. O README antigo (exemplo com raiva) filtrava
+      CLASSI_FIN IN ('1','8') e DESCARTAVA linhas sem NU_IDADE_N. Se o banco
+      antigo seguiu isso, as contagens legadas ficam abaixo do total real.

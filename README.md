@@ -22,6 +22,11 @@ graph TD;
 
 
 ## Reprodutibilidade
+
+> ⚠️ **O código desta seção usa a API antiga do PySUS (anterior à 2.x) e não funciona mais.**
+> O pipeline novo, reproduzível e em Docker, está em [`pipeline/`](pipeline/README.md).
+> Este texto foi mantido como registro do método usado no TCC (2024).
+
 Para a construção de gráficos no R, são necessários os conjuntos de dados com informações. Como maneira de se obter essas informações, em especial as de interesse do projeto, é necessário o download dos
 microdados do Sinan. O Datasus oferece um sistema de donwload dos microdados, mas esse opera em software obsoleto. Como maneira de facilitar a obtenção dessa informação, utilizou-se o pacote PySUS, da linguagem
 Python, que permite download de microdados do Sinan.
