@@ -15,6 +15,7 @@ data/gold/
   doencas.parquet    doenca, codigo, nome, definicao, expressao, padrao, filtro, notas, texto_app
   arquivos.parquet   doenca, codigo, ano, status (FINAL/PRELIM), data_coleta, linhas, aviso
   meta.json          data de geração, versões, fontes
+  tendencia.parquet  gerado por tendencia.py (roda depois do gold)
 """
 
 from __future__ import annotations

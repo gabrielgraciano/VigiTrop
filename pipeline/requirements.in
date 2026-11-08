@@ -6,3 +6,4 @@ duckdb
 pyarrow
 PyYAML
 openpyxl     # lê a planilha de população do IBGE
+numpy        # tendencia.py (mínimos quadrados); já vinha travado pelo pandas

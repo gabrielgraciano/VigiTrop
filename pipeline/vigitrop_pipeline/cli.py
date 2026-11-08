@@ -46,8 +46,10 @@ def _parser() -> argparse.ArgumentParser:
     sem_filtro = {
         "populacao": "baixa a projeção do IBGE (revisão 2024) e gera data/gold/populacao.parquet",
         "gold": "silver -> data/gold/casos.parquet + doencas, arquivos, meta",
+        "tendencia": "tendência da incidência Brasil (joinpoint): data/gold/tendencia.parquet "
+                     "+ comparação com o TCC (data/relatorios/tendencia_tcc.csv)",
         "validar": "compara o gold com a Tabela 1 do TCC (data/relatorios/validacao_tcc.csv)",
-        "executar": "tudo, em ordem: baixar, populacao, silver, gold, validar",
+        "executar": "tudo, em ordem: baixar, populacao, silver, gold, tendencia, validar",
     }
     for nome, texto in {**com_filtro, **sem_filtro}.items():
         s = sub.add_parser(nome, help=texto, description=texto)
@@ -104,6 +106,9 @@ def main(argv: list[str] | None = None) -> int:
         if c in ("gold", "executar"):
             from . import gold
             gold.gerar(pastas, cfg)
+        if c in ("tendencia", "executar"):
+            from . import tendencia
+            tendencia.gerar(pastas, cfg)
         if c in ("validar", "executar"):
             from .validacao import validar
             validar(pastas, cfg)

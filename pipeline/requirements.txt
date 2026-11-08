@@ -1,5 +1,6 @@
 # GERADO a partir de requirements.in (ver instruções lá). Não editar à mão.
 # Python 3.12.16 (python:3.12.16-slim-trixie), gerado em 2026-11-01; openpyxl adicionado em 2026-11-08.
+# numpy virou dependência direta em 2026-11-08 (tendencia.py), na mesma versão que já estava travada.
 aioftp==0.21.4
 annotated-doc==0.0.5
 annotated-types==0.8.0
