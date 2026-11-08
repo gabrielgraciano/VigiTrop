@@ -21,6 +21,8 @@ selecionar_sexo <- pickerInput("sexo", "Selecione o sexo:", choices = SEXOS, sel
 selecionar_idade <- pickerInput("faixa_etaria", "Selecione a faixa etária:",
                                 choices = c("Todas" = "Todos", stats::setNames(FAIXAS, FAIXAS)),
                                 selected = "Todos", multiple = TRUE)
+selecionar_periodicidade_st <- radioButtons("periodicidade_st", "Periodicidade", inline = TRUE,
+                                            choices = c("Anual" = "anual", "Mensal" = "mensal"))
 botao_st <- actionButton("update_st", "Atualizar plot")
 
 #Pirâmide etária----

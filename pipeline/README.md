@@ -57,6 +57,7 @@ O app lê só estes arquivos, via DuckDB. Juntos ocupam menos de 2 MB.
 | Arquivo | Colunas |
 |---|---|
 | `casos.parquet` | `doenca`, `definicao`, `ano`, `uf`, `sexo`, `faixa_etaria`, `raca`, `casos` |
+| `casos_mes.parquet` | `doenca`, `definicao`, `mes` (dia 1), `uf`, `sexo`, `faixa_etaria`, `casos`: mês da data de notificação. Os 12 meses somam o ano de `casos.parquet`. |
 | `casos_semana.parquet` | `doenca`, `definicao`, `semana` (AAAASS), `inicio_semana`, `uf`, `casos`: semana epidemiológica de início dos sintomas. Hanseníase e LTA ficam de fora porque não têm o campo. |
 | `populacao.parquet` | `ano`, `uf`, `sexo`, `faixa_etaria`, `populacao` (2000-2070) |
 | `doencas.parquet` | `doenca`, `codigo`, `nome`, `definicao`, `expressao`, `padrao`, `filtro`, `notas`, `texto_app` |

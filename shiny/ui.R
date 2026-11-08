@@ -31,6 +31,7 @@ ui <- page_navbar(
                   selecionar_uf_st,
                   selecionar_sexo,
                   selecionar_idade,
+                  selecionar_periodicidade_st,
                   botao_st
                   
                 ),

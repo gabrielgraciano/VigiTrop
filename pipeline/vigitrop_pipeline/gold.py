@@ -8,6 +8,9 @@ data/gold/
                      - sem linhas agregadas ("Brasil", "Todos"): o total é sempre a soma
                      - uma linha conta em todas as definições que satisfaz; o app filtra
                        `definicao` (padrão em doencas.parquet)
+  casos_mes.parquet  doenca, definicao, mes (DATE, dia 1), uf, sexo, faixa_etaria, casos
+                     - mês da data de NOTIFICAÇÃO (DT_NOTIFIC): os 12 meses somam o ano
+                       de casos.parquet
   casos_semana.parquet  doenca, definicao, semana (AAAASS), inicio_semana (DATE), uf, casos
                      - semana epidemiológica de INÍCIO DOS SINTOMAS (SEM_PRI); sem
                        hanseníase e LTA (o campo não existe nessas fichas)
@@ -85,6 +88,18 @@ def gerar(pastas: Pastas, cfg: Config) -> None:
         WHERE ano BETWEEN {cfg.ano_inicio} AND {ano_max}
         GROUP BY ALL
         ORDER BY doenca, definicao, ano, uf, sexo, faixa_etaria, raca""", g / "casos.parquet")
+
+    # Série mensal: mês da notificação, com sexo e faixa etária (os filtros da
+    # série temporal do app).
+    partes_mes = [p.replace("ano_notificacao AS ano, uf_res AS uf, sexo, faixa_etaria, raca",
+                            "CAST(date_trunc('month', dt_notific) AS DATE) AS mes, uf_res AS uf, sexo, faixa_etaria")
+                  for p in partes]
+    _copiar(con, f"""
+        SELECT doenca, definicao, mes, uf, sexo, faixa_etaria, CAST(count(*) AS INTEGER) AS casos
+        FROM ({' UNION ALL '.join(partes_mes)})
+        WHERE year(mes) BETWEEN {cfg.ano_inicio} AND {ano_max}
+        GROUP BY ALL
+        ORDER BY doenca, definicao, mes, uf, sexo, faixa_etaria""", g / "casos_mes.parquet")
 
     # Curva epidêmica: casos por semana epidemiológica de início dos sintomas.
     # Semana 1 = a que contém 4 de janeiro (semanas de domingo a sábado), então

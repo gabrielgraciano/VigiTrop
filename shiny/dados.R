@@ -36,6 +36,12 @@ casos$definicao <- NULL
 casos$uf <- as.integer(casos$uf)
 casos$ano <- as.integer(casos$ano)
 
+# Casos por mês de notificação (os 12 meses somam o ano de `casos`)
+casos_mes <- merge(ler_parquet("casos_mes.parquet"), padroes[, c("doenca", "definicao")], by = c("doenca", "definicao"))
+casos_mes$definicao <- NULL
+casos_mes$uf <- as.integer(casos_mes$uf)
+casos_mes$mes <- as.Date(casos_mes$mes)
+
 # Casos por semana epidemiológica de início dos sintomas (sem hanseníase e LTA)
 casos_semana <- merge(ler_parquet("casos_semana.parquet"), padroes[, c("doenca", "definicao")], by = c("doenca", "definicao"))
 casos_semana$definicao <- NULL
@@ -89,12 +95,15 @@ somar_por_ano <- function(valores, anos_obs, anos) {
 
 # ---- cálculos ----------------------------------------------------------------
 
-#' Incidência anual por 100 mil. `uf` = código IBGE ou "BR"; `sexo` = M, F ou
-#' "Ambos"; `faixas` = vetor de faixas ou "Todos". Brasil inclui casos com UF
-#' ignorada; "Ambos" inclui sexo ignorado; "Todos" inclui idade ignorada.
-serie_incidencia <- function(doenca, uf, sexo, faixas) {
+#' Incidência por 100 mil, anual ou mensal. `uf` = código IBGE ou "BR"; `sexo`
+#' = M, F ou "Ambos"; `faixas` = vetor de faixas ou "Todos". Brasil inclui casos
+#' com UF ignorada; "Ambos" inclui sexo ignorado; "Todos" inclui idade ignorada.
+#' Mensal: casos notificados no mês por 100 mil habitantes (população do ano).
+serie_incidencia <- function(doenca, uf, sexo, faixas, periodicidade = c("anual", "mensal")) {
+  periodicidade <- match.arg(periodicidade)
   anos <- anos_da_doenca(doenca)
-  cs <- filtrar_uf(casos[casos$doenca == doenca, ], uf)
+  base <- if (periodicidade == "anual") casos else casos_mes
+  cs <- filtrar_uf(base[base$doenca == doenca, ], uf)
   ps <- filtrar_uf(populacao[populacao$ano %in% anos, ], uf)
   if (sexo != "Ambos") {
     cs <- cs[cs$sexo == sexo, ]
@@ -104,9 +113,17 @@ serie_incidencia <- function(doenca, uf, sexo, faixas) {
     cs <- cs[cs$faixa_etaria %in% faixas, ]
     ps <- ps[ps$faixa_etaria %in% faixas, ]
   }
-  n <- somar_por_ano(cs$casos, cs$ano, anos)
   p <- somar_por_ano(ps$populacao, ps$ano, anos)
-  data.frame(ano = anos, casos = n, populacao = p, incidencia = round(n / p * 1e5, 2))
+  if (periodicidade == "anual") {
+    n <- somar_por_ano(cs$casos, cs$ano, anos)
+    return(data.frame(ano = anos, casos = n, populacao = p, incidencia = round(n / p * 1e5, 2)))
+  }
+  ultimo <- max(casos_mes$mes[casos_mes$doenca == doenca])
+  meses <- seq(as.Date(sprintf("%d-01-01", min(anos))), ultimo, by = "month")
+  n <- tapply(cs$casos, factor(as.character(cs$mes), levels = as.character(meses)), sum)
+  n[is.na(n)] <- 0
+  pop_mes <- p[match(as.integer(format(meses, "%Y")), anos)]
+  data.frame(mes = meses, casos = as.numeric(n), populacao = pop_mes, incidencia = round(as.numeric(n) / pop_mes * 1e5, 3))
 }
 
 #' Casos e incidência por UF num ano (para o mapa). Casos com UF ignorada ficam

@@ -8,12 +8,21 @@ COR_RACA <- c("1" = "#56B4E9", "2" = "#0072B2", "3" = "#F0E442", "4" = "#E69F00"
 COR_REGIAO <- c("Norte" = "#009E73", "Nordeste" = "#E69F00", "Sudeste" = "#0072B2", "Sul" = "#CC79A7", "Centro-Oeste" = "#D55E00")
 
 # Faixa cinza nos anos preliminares. Com `categorias` (eixo de categorias do
-# highcharter), a posição é o índice do ano, não o ano.
-faixa_preliminar <- function(doenca, categorias = NULL) {
+# highcharter), a posição é o índice do ano, não o ano; com `datas = TRUE`
+# (eixo datetime), vai de 1º de janeiro a 31 de dezembro, em milissegundos.
+faixa_preliminar <- function(doenca, categorias = NULL, datas = FALSE) {
   prelim <- arquivos$ano[arquivos$doenca == doenca & arquivos$status == "PRELIM"]
   if (!length(prelim)) return(list())
-  pos <- if (is.null(categorias)) prelim else match(prelim, categorias) - 1
-  list(list(from = min(pos) - 0.5, to = max(pos) + 0.5, color = "rgba(0,0,0,0.05)",
+  if (datas) {
+    ms <- function(d) as.numeric(as.POSIXct(d, tz = "UTC")) * 1000
+    de <- ms(sprintf("%d-01-01", min(prelim)))
+    ate <- ms(sprintf("%d-12-31", max(prelim)))
+  } else {
+    pos <- if (is.null(categorias)) prelim else match(prelim, categorias) - 1
+    de <- min(pos) - 0.5
+    ate <- max(pos) + 0.5
+  }
+  list(list(from = de, to = ate, color = "rgba(0,0,0,0.05)",
             label = list(text = "preliminar", style = list(color = "#888"))))
 }
 
@@ -25,27 +34,42 @@ server <- function(input, output, session) {
     ufs_sel <- validar(input$uf_st, escolhas_uf_brasil)
     sexos <- validar(input$sexo, SEXOS)
     faixas <- validar(input$faixa_etaria, c("Todos", FAIXAS))
+    periodicidade <- validar(input$periodicidade_st, c("anual", "mensal"))
     linhas <- list()
     for (u in ufs_sel) for (s in sexos) {
-      d <- serie_incidencia(doenca, u, s, faixas)
+      d <- serie_incidencia(doenca, u, s, faixas, periodicidade)
       d$serie <- paste(nome_uf(u), rotulo_sexo(s), sep = ", ")
       linhas[[length(linhas) + 1]] <- d
     }
-    list(doenca = doenca, dados = do.call(rbind, linhas))
+    list(doenca = doenca, periodicidade = periodicidade, dados = do.call(rbind, linhas))
   }, ignoreNULL = FALSE)
 
   output$monthplot <- renderHighchart({
     r <- serie()
-    hchart(r$dados, "line", hcaes(x = ano, y = incidencia, group = serie)) |>
+    mensal <- r$periodicidade == "mensal"
+    hc <- if (mensal) {
+      hchart(r$dados, "line", hcaes(x = mes, y = incidencia, group = serie)) |>
+        hc_xAxis(title = list(text = "Mês"), type = "datetime", plotBands = faixa_preliminar(r$doenca, datas = TRUE)) |>
+        hc_tooltip(shared = TRUE, crosshairs = TRUE, valueDecimals = 3, xDateFormat = "%m/%Y") |>
+        hc_plotOptions(series = list(marker = list(enabled = FALSE)))
+    } else {
+      hchart(r$dados, "line", hcaes(x = ano, y = incidencia, group = serie)) |>
+        hc_xAxis(title = list(text = "Ano"), allowDecimals = FALSE, plotBands = faixa_preliminar(r$doenca)) |>
+        hc_tooltip(shared = TRUE, crosshairs = TRUE, valueDecimals = 2)
+    }
+    hc |>
       hc_colors(OKABE_ITO) |>
-      hc_title(text = paste("Incidência de", nome_doenca(r$doenca))) |>
-      hc_xAxis(title = list(text = "Ano"), allowDecimals = FALSE, plotBands = faixa_preliminar(r$doenca)) |>
-      hc_yAxis(title = list(text = "Taxa de incidência por 100 mil habitantes"), min = 0) |>
-      hc_tooltip(shared = TRUE, crosshairs = TRUE, valueDecimals = 2) |>
+      hc_title(text = paste(if (mensal) "Incidência mensal de" else "Incidência de", nome_doenca(r$doenca))) |>
+      hc_yAxis(title = list(text = if (mensal) "Casos no mês por 100 mil habitantes" else "Taxa de incidência por 100 mil habitantes"), min = 0) |>
       hc_legend(title = list(text = "UF, Sexo")) |>
       hc_exporting(enabled = TRUE)
   })
-  output$nota_st <- renderUI(nota_doenca(serie()$doenca))
+  output$nota_st <- renderUI({
+    r <- serie()
+    nota_doenca(r$doenca, if (r$periodicidade == "mensal") paste(
+      "Mensal: casos notificados no mês (data de notificação) por 100 mil habitantes, com a população do ano.",
+      "Os 12 meses somam a incidência anual."))
+  })
 
   #Pirâmide etária----
   piramide <- eventReactive(input$update_pe, {
