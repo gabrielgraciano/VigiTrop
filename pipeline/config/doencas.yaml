@@ -164,36 +164,43 @@ doencas:
     codigo: LEIV
     nome: Leishmaniose visceral
     texto_app: >
-      Casos confirmados, critério do Ministério da Saúde.
+      Casos confirmados, critério do Ministério da Saúde, sem as transferências (o mesmo caso notificado de novo em outra unidade).
     tabela_legada: leishmaniose_visceral
     colunas_codigo_extras: [ENTRADA]
     # Decisão (08/11/2026): padrão = só confirmados, como conta o Ministério da
     # Saúde. O código 8 é encerramento automático por prazo, não diagnóstico
     # (docs/investigacao_definicoes.md, seção 1).
+    # Decisão (08/11/2026): sem transferências (ENTRADA 3), que repetem o
+    # caso em outra unidade. Recidivas ficam, por enquanto (BACKLOG.md).
     definicoes:
-      confirmado: "CLASSI_FIN = '1'"
-      provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN <> '2'"
+      confirmado: "CLASSI_FIN = '1' AND (ENTRADA IS NULL OR ENTRADA <> '3')"
+      provavel: "(CLASSI_FIN IS NULL OR CLASSI_FIN <> '2') AND (ENTRADA IS NULL OR ENTRADA <> '3')"
       # Regra do TCC: confirmado + inconclusivo (8). Bate exato com a
       # Tabela 1 em 2010, 2015, 2020 e 2022.
       legado_tcc: "CLASSI_FIN IN ('1','8')"
     notas: >
-      ENTRADA: 1 caso novo, 2 recidiva, 3 transferência. Decidir se
-      transferências saem da contagem (evita contar o mesmo caso duas vezes).
+      ENTRADA: 1 caso novo, 2 recidiva, 3 transferência. As recidivas
+      (de 80 a 260 por ano) ainda entram: falta confirmar o indicador exato
+      do Ministério.
 
   leishmaniose_tegumentar:
     codigo: LTAN
     nome: Leishmaniose tegumentar americana
     texto_app: >
-      Todas as notificações (só casos confirmados são notificados).
+      Casos notificados (a notificação exige confirmação), sem as transferências e sem os encerrados por mudança de diagnóstico.
     tabela_legada: leishmaniose_tegumentar
     colunas_codigo_extras: [CLA_TIPO_N, CLAS_FORMA]
     definicoes:
       # A ficha não tem CLASSI_FIN: só casos confirmados são notificados.
-      # Igual ao TCC: bate exato com a Tabela 1 em 2010, 2015, 2020 e 2022.
-      confirmado: "TRUE"
+      # Decisão (08/11/2026): sem transferências (CLA_TIPO_N 3) e sem os
+      # encerrados por mudança de diagnóstico (EVOLUCAO 6), que não eram LTA.
+      confirmado: "(CLA_TIPO_N IS NULL OR CLA_TIPO_N <> '3') AND (EVOLUCAO IS NULL OR EVOLUCAO <> '6')"
+      # Regra do TCC: todas as notificações. Bate exato com a Tabela 1 em
+      # 2010, 2015, 2020 e 2022.
+      legado_tcc: "TRUE"
     notas: >
-      CLA_TIPO_N: 1 caso novo, 2 recidiva, 3 transferência. Mesma decisão
-      da leishmaniose visceral.
+      CLA_TIPO_N: 1 caso novo, 2 recidiva, 3 transferência. As recidivas
+      (de 750 a 1.300 por ano) ainda entram, como na LV.
 
   envenenamento_serpente:
     codigo: ANIM

@@ -6,13 +6,6 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 
 ## Para decidir: definições de caso (com recomendação da pesquisa)
 
-### Transferências nas leishmanioses (`ENTRADA` / `CLA_TIPO_N = 3`), aguardando ok do Gabriel
-
-- Pesam de 0,7% a 2,7% na LV e 0,5% na LTA. Na LV não há sinal de contagem dupla; na LTA, umas 100 duplicatas prováveis em 19 anos.
-- Achado à parte: a LTA conta hoje de 170 a 370 registros por ano encerrados como "mudança de diagnóstico", que não são LTA.
-
-**Recomendação:** excluir as transferências e, na LTA, os encerrados por mudança de diagnóstico (`EVOLUCAO = 6`). Manter as recidivas por enquanto, até confirmar o indicador exato do Ministério (LV: 80 a 260 por ano; LTA: 750 a 1.300).
-
 ### Ano de referência (prioridade baixa)
 
 - Os arquivos de dengue e chik já vêm recortados pelo ano epidemiológico dos primeiros sintomas; os demais, pelo ano de notificação.
@@ -24,6 +17,7 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 
 - **Inconclusivos (08/11/2026, revisto):** o padrão de raiva, Chagas e leishmaniose visceral passa a ser só confirmados (`CLASSI_FIN = 1`), como conta o Ministério. A pesquisa mostrou que o código 8 é encerramento automático por prazo, não diagnóstico (detalhes em `docs/investigacao_definicoes.md`, seção 1). Confirmados + inconclusivos continua no gold como `legado_tcc` (a regra do TCC). Raiva 2018: 11, igual ao Ministério. A queda artificial da tendência da raiva depois de 2021 sumiu.
 - **Serpentes (08/11/2026):** sem picada de serpente não peçonhenta (`ANI_SERPEN = 5`), que não causa envenenamento; a DTN da OMS é *snakebite envenoming*. O tipo ignorado (9) fica: 41% receberam soro e houve 223 óbitos.
+- **Leishmanioses (08/11/2026):** sem as transferências (LV: `ENTRADA = 3`; LTA: `CLA_TIPO_N = 3`), que repetem o caso em outra unidade, e, na LTA, sem os encerrados por mudança de diagnóstico (`EVOLUCAO = 6`). Efeito: LV 2018, 3.851 → 3.800; LTA 2018, 17.950 → 17.530. **Pendente:** as recidivas ainda entram (LV: 80 a 260 por ano; LTA: 750 a 1.300). Falta confirmar se o indicador do Ministério as inclui.
 - **Hanseníase (08/11/2026):** o padrão é casos novos (`MODOENTR = 1`, sem erro diagnóstico), o indicador oficial. O TCC contava todas as notificações, cerca de 30% a mais. A contagem antiga continua no gold como `legado_tcc`.
 - **Dengue e chikungunya (08/11/2026):** o padrão é casos prováveis (notificações menos as descartadas, inconclusivos incluídos), como o Ministério e o TCC. Os confirmados continuam no gold.
 - **Chikungunya 2014-2016 (08/11/2026, correção):** até meados de 2016 a ficha usava 1 = confirmado e 2 = descartado. A regra antiga só confirmava 665 casos em 2015 e contava os descartados como prováveis. Corrigido: o provável de 2015 dá 18,69 por 100 mil, e o Ministério publica 18,7. O valor do TCC para 2015 (16,03) não sai de nenhuma combinação de códigos.
