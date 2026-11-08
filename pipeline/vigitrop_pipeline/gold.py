@@ -8,6 +8,9 @@ data/gold/
                      - sem linhas agregadas ("Brasil", "Todos"): o total é sempre a soma
                      - uma linha conta em todas as definições que satisfaz; o app filtra
                        `definicao` (padrão em doencas.parquet)
+  casos_semana.parquet  doenca, definicao, semana (AAAASS), inicio_semana (DATE), uf, casos
+                     - semana epidemiológica de INÍCIO DOS SINTOMAS (SEM_PRI); sem
+                       hanseníase e LTA (o campo não existe nessas fichas)
   populacao.parquet  gerado por populacao.py
   doencas.parquet    doenca, codigo, nome, definicao, expressao, padrao, filtro, notas, texto_app
   arquivos.parquet   doenca, codigo, ano, status (FINAL/PRELIM), data_coleta, linhas, aviso
@@ -81,6 +84,21 @@ def gerar(pastas: Pastas, cfg: Config) -> None:
         WHERE ano BETWEEN {cfg.ano_inicio} AND {ano_max}
         GROUP BY ALL
         ORDER BY doenca, definicao, ano, uf, sexo, faixa_etaria, raca""", g / "casos.parquet")
+
+    # Curva epidêmica: casos por semana epidemiológica de início dos sintomas.
+    # Semana 1 = a que contém 4 de janeiro (semanas de domingo a sábado), então
+    # o início da semana é o domingo anterior (ou igual) a 4/jan + 7·(semana − 1).
+    partes_sem = [p.replace("ano_notificacao AS ano, uf_res AS uf, sexo, faixa_etaria, raca",
+                            "semana_sin_pri AS semana, uf_res AS uf") for p in partes]
+    _copiar(con, f"""
+        SELECT doenca, definicao, semana,
+               CAST(make_date(semana // 100, 1, 4) - CAST(dayofweek(make_date(semana // 100, 1, 4)) AS INTEGER)
+                    + 7 * (semana % 100 - 1) AS DATE) AS inicio_semana,
+               uf, CAST(count(*) AS INTEGER) AS casos
+        FROM ({' UNION ALL '.join(partes_sem)})
+        WHERE semana // 100 BETWEEN {cfg.ano_inicio} AND {ano_max} AND semana % 100 BETWEEN 1 AND 53
+        GROUP BY ALL
+        ORDER BY doenca, definicao, semana, uf""", g / "casos_semana.parquet")
 
     linhas_def = [
         (d.slug, d.codigo, d.nome, nome, expr, nome == d.padrao, d.filtro, d.notas, d.texto_app)

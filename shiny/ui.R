@@ -20,6 +20,7 @@ ui <- page_navbar(
                   condition = "input.navset == 'Gráfico de Barras'",
                   selecionar_doenca_estatistica_descritiva,
                   selecionar_uf_ed,
+                  selecionar_dist_ed,
                   botao_ed
                   
                 ),
@@ -32,6 +33,13 @@ ui <- page_navbar(
                   selecionar_idade,
                   botao_st
                   
+                ),
+                conditionalPanel(
+                  condition = "input.navset == 'Série semanal'",
+                  selecionar_doenca_sem,
+                  selecionar_uf_sem,
+                  selecionar_periodo_sem,
+                  botao_sem
                 ),
                 conditionalPanel(
                   condition = "input.navset == 'Pirâmide Etária'",
@@ -61,6 +69,7 @@ ui <- page_navbar(
                 nav_panel('Mapas', cards[[4]]),
                 nav_panel('Gráfico de Barras', cards[[3]]),
                 nav_panel('Série temporal', cards[[1]]),
+                nav_panel('Série semanal', cards[[6]]),
                 nav_panel('Pirâmide Etária', cards[[2]]),
                 nav_panel('Animação - barras', cards[[5]]),
                 

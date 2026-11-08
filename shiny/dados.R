@@ -22,6 +22,7 @@ FAIXAS <- c("0-4", "5-9", "10-14", "15-19", "20-24", "25-29", "30-34", "35-39", 
             "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80-84", "85-89",
             "90 ou mais")
 SEXOS <- c("Ambos" = "Ambos", "Masculino" = "M", "Feminino" = "F")
+RACAS <- c("1" = "Branca", "2" = "Preta", "3" = "Amarela", "4" = "Parda", "5" = "Indígena", "9" = "Ignorada")
 BRASIL <- "BR"
 
 # ---- leitura -----------------------------------------------------------------
@@ -34,6 +35,12 @@ casos <- merge(ler_parquet("casos.parquet"), padroes[, c("doenca", "definicao")]
 casos$definicao <- NULL
 casos$uf <- as.integer(casos$uf)
 casos$ano <- as.integer(casos$ano)
+
+# Casos por semana epidemiológica de início dos sintomas (sem hanseníase e LTA)
+casos_semana <- merge(ler_parquet("casos_semana.parquet"), padroes[, c("doenca", "definicao")], by = c("doenca", "definicao"))
+casos_semana$definicao <- NULL
+casos_semana$uf <- as.integer(casos_semana$uf)
+casos_semana$inicio_semana <- as.Date(casos_semana$inicio_semana)
 
 populacao <- ler_parquet("populacao.parquet")
 populacao$uf <- as.integer(populacao$uf)
@@ -52,6 +59,7 @@ ufs <- ufs[order(ufs$NM_UF), ]
 
 escolhas_doenca <- stats::setNames(padroes$doenca, padroes$nome)
 escolhas_doenca <- escolhas_doenca[order(names(escolhas_doenca))]
+escolhas_doenca_semana <- escolhas_doenca[escolhas_doenca %in% unique(casos_semana$doenca)]
 escolhas_uf <- stats::setNames(as.character(ufs$CD_UF), ufs$NM_UF)
 escolhas_uf_brasil <- c("Brasil" = BRASIL, escolhas_uf)
 anos_disponiveis <- sort(unique(arquivos$ano))
@@ -117,18 +125,35 @@ dados_mapa <- function(doenca, ano) {
   m
 }
 
-#' Casos por ano e sexo (M/F) numa UF, com a porcentagem de cada sexo no ano.
-dados_barras_sexo <- function(doenca, uf) {
-  cs <- filtrar_uf(casos[casos$doenca == doenca & casos$sexo %in% c("M", "F"), ], uf)
+#' Casos por ano numa UF, distribuídos por sexo (M/F; sexo ignorado fica de
+#' fora) ou por raça/cor (1-5 e 9 = ignorada, que entra na conta), com a
+#' porcentagem de cada grupo no ano.
+dados_barras <- function(doenca, uf, por = c("sexo", "raca")) {
+  por <- match.arg(por)
+  grupos <- if (por == "sexo") c("M", "F") else names(RACAS)
+  cs <- filtrar_uf(casos[casos$doenca == doenca & casos[[por]] %in% grupos, ], uf)
   anos <- anos_da_doenca(doenca)
-  out <- expand.grid(ano = anos, sexo = c("M", "F"), stringsAsFactors = FALSE)
-  chave <- paste(cs$ano, cs$sexo)
-  s <- tapply(cs$casos, chave, sum)
-  out$casos <- as.numeric(s[paste(out$ano, out$sexo)])
+  out <- expand.grid(ano = anos, grupo = grupos, stringsAsFactors = FALSE)
+  s <- tapply(cs$casos, paste(cs$ano, cs[[por]]), sum)
+  out$casos <- as.numeric(s[paste(out$ano, out$grupo)])
   out$casos[is.na(out$casos)] <- 0
   tot <- ave(out$casos, out$ano, FUN = sum)
   out$porcentagem <- ifelse(tot > 0, 100 * out$casos / tot, NA_real_)
   out
+}
+
+#' Casos por semana epidemiológica de início dos sintomas, por UF (ou Brasil),
+#' entre os anos `de` e `ate`. Semanas sem caso entram com zero.
+dados_semana <- function(doenca, ufs_sel, de, ate) {
+  sel <- casos_semana[casos_semana$doenca == doenca & casos_semana$semana %/% 100 >= de & casos_semana$semana %/% 100 <= ate, ]
+  semanas <- sort(unique(casos_semana$inicio_semana[casos_semana$semana %/% 100 >= de & casos_semana$semana %/% 100 <= ate]))
+  saida <- lapply(ufs_sel, function(u) {
+    d <- filtrar_uf(sel, u)
+    n <- tapply(d$casos, factor(as.character(d$inicio_semana), levels = as.character(semanas)), sum)
+    n[is.na(n)] <- 0
+    data.frame(inicio_semana = semanas, casos = as.numeric(n), uf = nome_uf(u))
+  })
+  do.call(rbind, saida)
 }
 
 #' Casos por faixa etária e sexo (M/F) numa UF e ano. Idade ignorada volta em attr(, "sem_idade").

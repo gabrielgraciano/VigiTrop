@@ -4,6 +4,7 @@
 
 OKABE_ITO <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#999999")
 COR_SEXO <- c(M = "#049899", F = "#ed9400")
+COR_RACA <- c("1" = "#56B4E9", "2" = "#0072B2", "3" = "#F0E442", "4" = "#E69F00", "5" = "#009E73", "9" = "#999999")
 COR_REGIAO <- c("Norte" = "#009E73", "Nordeste" = "#E69F00", "Sudeste" = "#0072B2", "Sul" = "#CC79A7", "Centro-Oeste" = "#D55E00")
 
 # Faixa cinza nos anos preliminares. Com `categorias` (eixo de categorias do
@@ -87,26 +88,61 @@ server <- function(input, output, session) {
   barras <- eventReactive(input$update_ed, {
     doenca <- validar(input$doenca_ed, escolhas_doenca)
     uf <- validar(input$uf_ed, escolhas_uf_brasil)
-    list(doenca = doenca, uf = uf, dados = dados_barras_sexo(doenca, uf))
+    por <- validar(input$dist_ed, c("sexo", "raca"))
+    list(doenca = doenca, uf = uf, por = por, dados = dados_barras(doenca, uf, por))
   }, ignoreNULL = FALSE)
 
   output$barplot_porcentagem <- renderHighchart({
     r <- barras()
     d <- r$dados
-    serie_sexo <- function(s) lapply(which(d$sexo == s), function(i) list(y = d$porcentagem[i], casos = formatar_numero(d$casos[i])))
-    highchart() |>
+    serie_grupo <- function(g) lapply(which(d$grupo == g), function(i) list(y = d$porcentagem[i], casos = formatar_numero(d$casos[i])))
+    grupos <- if (r$por == "sexo") c("M" = "Masculino", "F" = "Feminino") else RACAS
+    cores <- if (r$por == "sexo") COR_SEXO else COR_RACA
+    hc <- highchart() |>
       hc_chart(type = "column") |>
       hc_xAxis(categories = unique(d$ano), title = list(text = "Ano"), plotBands = faixa_preliminar(r$doenca, unique(d$ano))) |>
       hc_yAxis(title = list(text = "Porcentagem"), labels = list(format = "{value}%"), max = 100) |>
-      hc_plotOptions(column = list(stacking = "normal", dataLabels = list(enabled = TRUE, format = "{point.y:.1f}%"))) |>
-      hc_add_series(data = serie_sexo("M"), name = "Masculino", color = COR_SEXO[["M"]]) |>
-      hc_add_series(data = serie_sexo("F"), name = "Feminino", color = COR_SEXO[["F"]]) |>
+      hc_plotOptions(column = list(stacking = "normal", reversedStacks = FALSE,
+                                   dataLabels = list(enabled = r$por == "sexo", format = "{point.y:.1f}%")))
+    for (g in names(grupos)) hc <- hc |> hc_add_series(data = serie_grupo(g), name = grupos[[g]], color = cores[[g]])
+    hc |>
       hc_tooltip(shared = FALSE, headerFormat = "<b>{point.key}</b><br>",
                  pointFormat = "{series.name}: {point.casos} casos ({point.y:.1f}%)") |>
-      hc_title(text = paste0("Distribuição percentual de casos de ", nome_doenca(r$doenca), " por sexo, ", nome_uf(r$uf))) |>
+      hc_title(text = paste0("Distribuição percentual de casos de ", nome_doenca(r$doenca), " por ",
+                             if (r$por == "sexo") "sexo" else "raça/cor", ", ", nome_uf(r$uf))) |>
       hc_exporting(enabled = TRUE)
   })
-  output$nota_ed <- renderUI(nota_doenca(barras()$doenca, "Casos com sexo ignorado não entram na porcentagem."))
+  output$nota_ed <- renderUI({
+    r <- barras()
+    nota_doenca(r$doenca, if (r$por == "sexo") "Casos com sexo ignorado não entram na porcentagem."
+                else "Raça/cor ignorada ou em branco entra como \"Ignorada\". Sem incidência por raça/cor: a projeção do IBGE não tem essa abertura.")
+  })
+
+  #Série semanal----
+  semanal <- eventReactive(input$update_sem, {
+    doenca <- validar(input$doenca_sem, escolhas_doenca_semana)
+    ufs_sel <- validar(input$uf_sem, escolhas_uf_brasil)
+    periodo <- as.integer(validar(input$periodo_sem, anos_disponiveis))
+    list(doenca = doenca, dados = dados_semana(doenca, ufs_sel, min(periodo), max(periodo)))
+  }, ignoreNULL = FALSE)
+
+  output$serie_semanal <- renderHighchart({
+    r <- semanal()
+    validate(need(nrow(r$dados) > 0, "Não há semanas nesse período."))
+    hchart(r$dados, "line", hcaes(x = inicio_semana, y = casos, group = uf)) |>
+      hc_colors(OKABE_ITO) |>
+      hc_title(text = paste("Casos de", nome_doenca(r$doenca), "por semana epidemiológica de início dos sintomas")) |>
+      hc_xAxis(title = list(text = "Semana (data de início)"), type = "datetime") |>
+      hc_yAxis(title = list(text = "Casos"), min = 0) |>
+      hc_tooltip(shared = TRUE, crosshairs = TRUE, xDateFormat = "Semana de %d/%m/%Y") |>
+      hc_plotOptions(series = list(marker = list(enabled = FALSE))) |>
+      hc_legend(title = list(text = "UF")) |>
+      hc_exporting(enabled = TRUE)
+  })
+  output$nota_sem <- renderUI(nota_doenca(semanal()$doenca, paste(
+    "Semana epidemiológica de início dos sintomas (domingo a sábado), não ano de notificação: os totais",
+    "podem diferir um pouco das outras abas. As semanas mais recentes ficam incompletas até as notificações",
+    "serem digitadas. Hanseníase e leishmaniose tegumentar não têm esse campo.")))
 
   #Mapas----
   mapa <- eventReactive(input$update_map, {

@@ -49,11 +49,12 @@ Opções:
 
 ## O gold (`data/gold/`)
 
-O app lê só estes arquivos, via DuckDB. Juntos ocupam cerca de 1,3 MB.
+O app lê só estes arquivos, via DuckDB. Juntos ocupam menos de 2 MB.
 
 | Arquivo | Colunas |
 |---|---|
 | `casos.parquet` | `doenca`, `definicao`, `ano`, `uf`, `sexo`, `faixa_etaria`, `raca`, `casos` |
+| `casos_semana.parquet` | `doenca`, `definicao`, `semana` (AAAASS), `inicio_semana`, `uf`, `casos`: semana epidemiológica de início dos sintomas. Hanseníase e LTA ficam de fora porque não têm o campo. |
 | `populacao.parquet` | `ano`, `uf`, `sexo`, `faixa_etaria`, `populacao` (2000-2070) |
 | `doencas.parquet` | `doenca`, `codigo`, `nome`, `definicao`, `expressao`, `padrao`, `filtro`, `notas`, `texto_app` |
 | `arquivos.parquet` | `doenca`, `codigo`, `ano`, `status` (FINAL/PRELIM), `data_coleta`, `linhas`, `aviso` |

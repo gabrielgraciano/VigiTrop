@@ -28,5 +28,11 @@ cards <- list(
     card_header('Animação de Barras'),
     plotlyOutput('bar_chart_race', height = "650px"),
     card_footer(uiOutput("nota_br"))
+  ),
+  card(
+    full_screen = TRUE,
+    card_header("Série semanal"),
+    highchartOutput("serie_semanal"),
+    card_footer(uiOutput("nota_sem"))
   )
 )

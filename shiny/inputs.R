@@ -32,7 +32,16 @@ botao_pe <- actionButton("update_pe", "Atualizar plot")
 #Gráfico de barras----
 selecionar_doenca_estatistica_descritiva <- seletor_doenca("doenca_ed")
 selecionar_uf_ed <- seletor_uf("uf_ed")
+selecionar_dist_ed <- radioButtons("dist_ed", "Distribuir por", choices = c("Sexo" = "sexo", "Raça/cor" = "raca"))
 botao_ed <- actionButton("update_ed", "Atualizar plot")
+
+#Série semanal----
+selecionar_doenca_sem <- pickerInput("doenca_sem", "Selecione a doença de interesse", choices = escolhas_doenca_semana)
+selecionar_uf_sem <- seletor_uf("uf_sem", multiplo = TRUE)
+selecionar_periodo_sem <- sliderInput("periodo_sem", "Período (ano da semana)", min = min(anos_disponiveis),
+                                      max = max(anos_disponiveis), value = c(max(anos_disponiveis) - 2, max(anos_disponiveis)),
+                                      step = 1, sep = "")
+botao_sem <- actionButton("update_sem", "Atualizar plot")
 
 #Mapas----
 selecionar_doenca_map <- seletor_doenca("doenca_map")
