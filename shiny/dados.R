@@ -52,6 +52,9 @@ populacao <- ler_parquet("populacao.parquet")
 populacao$uf <- as.integer(populacao$uf)
 populacao$ano <- as.integer(populacao$ano)
 
+# Tendência (joinpoint) da definição padrão; opcional: sem o arquivo, a aba avisa.
+tendencias <- if (file.exists(file.path(dir_gold, "tendencia.parquet"))) ler_parquet("tendencia.parquet") else NULL
+
 arquivos <- ler_parquet("arquivos.parquet")
 arquivos$ano <- as.integer(arquivos$ano)
 meta <- jsonlite::fromJSON(file.path(dir_gold, "meta.json"))
@@ -200,6 +203,25 @@ dados_corrida <- function(doenca, tipo) {
   grade <- grade[order(grade$ano, -grade$valor, grade$sigla), ]
   grade$posicao <- ave(grade$valor, grade$ano, FUN = seq_along)
   grade
+}
+
+#' Segmentos (APC) e período (AAPC) da tendência de uma doença; NULL se não houver.
+tendencia_doenca <- function(doenca) {
+  if (is.null(tendencias)) return(NULL)
+  t <- tendencias[tendencias$doenca == doenca, ]
+  if (!nrow(t)) return(NULL)
+  t[order(t$tipo != "APC", t$segmento), ]
+}
+
+#' Incidência ajustada pelo modelo, ano a ano, a partir dos segmentos
+#' (log-linear: taxa_inicio · (1 + APC/100)^(t − ano_inicio)).
+tendencia_ajustada <- function(t) {
+  seg <- t[t$tipo == "APC", ]
+  do.call(rbind, lapply(seq_len(nrow(seg)), function(i) {
+    anos <- seq(seg$ano_inicio[i], seg$ano_fim[i])
+    data.frame(ano = anos, segmento = seg$segmento[i],
+               ajustada = seg$taxa_inicio[i] * (1 + seg$apc[i] / 100)^(anos - seg$ano_inicio[i]))
+  }))
 }
 
 # ---- textos ------------------------------------------------------------------

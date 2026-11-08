@@ -28,6 +28,65 @@ faixa_preliminar <- function(doenca, categorias = NULL, datas = FALSE) {
 
 server <- function(input, output, session) {
 
+  #Tendência----
+  tend <- reactive({
+    doenca <- validar(input$doenca_tend, escolhas_doenca)
+    list(doenca = doenca, t = tendencia_doenca(doenca),
+         obs = serie_incidencia(doenca, BRASIL, "Ambos", "Todos"))
+  })
+
+  output$tend_plot <- renderHighchart({
+    r <- tend()
+    validate(need(!is.null(r$t), "Tendência ainda não calculada. Rode o comando `tendencia` do pipeline."))
+    aj <- tendencia_ajustada(r$t)
+    usados <- r$obs[r$obs$ano %in% aj$ano, ]
+    fora <- r$obs[!r$obs$ano %in% aj$ano, ]
+    hc <- highchart() |>
+      hc_add_series(usados, "scatter", hcaes(x = ano, y = incidencia), name = "Observada",
+                    color = "#0072B2", marker = list(radius = 4))
+    if (nrow(fora) > 0) {
+      hc <- hc |> hc_add_series(fora, "scatter", hcaes(x = ano, y = incidencia), name = "Observada (preliminar, fora do modelo)",
+                                color = "#BBBBBB", marker = list(radius = 4))
+    }
+    for (s in unique(aj$segmento)) {
+      a <- aj[aj$segmento == s, ]
+      hc <- hc |> hc_add_series(a, "line", hcaes(x = ano, y = ajustada), name = paste("Segmento", s),
+                                color = OKABE_ITO[(s - 1) %% length(OKABE_ITO) + 1], marker = list(enabled = FALSE),
+                                enableMouseTracking = FALSE)
+    }
+    hc |>
+      hc_title(text = paste("Incidência de", nome_doenca(r$doenca), "e tendência ajustada")) |>
+      hc_xAxis(title = list(text = "Ano"), allowDecimals = FALSE) |>
+      hc_yAxis(title = list(text = "Por 100 mil habitantes"), min = 0) |>
+      hc_tooltip(valueDecimals = 2, headerFormat = "<b>{point.x}</b><br>") |>
+      hc_exporting(enabled = TRUE)
+  })
+
+  output$tend_tabela <- renderUI({
+    t <- tend()$t
+    if (is.null(t)) return(NULL)
+    fmt <- function(x) formatar_numero(x, 1)
+    linhas <- lapply(seq_len(nrow(t)), function(i) {
+      periodo <- if (t$tipo[i] == "AAPC") paste0("AAPC ", t$ano_inicio[i], "–", t$ano_fim[i]) else paste0(t$ano_inicio[i], "–", t$ano_fim[i])
+      sentido <- if (!t$significativo[i]) "Estável" else if (t$apc[i] > 0) "Crescente" else "Decrescente"
+      estilo <- if (t$tipo[i] == "AAPC") "font-weight:bold; border-top: 2px solid #ccc;" else ""
+      tags$tr(style = estilo,
+              tags$td(periodo),
+              tags$td(paste0(fmt(t$apc[i]), if (t$significativo[i]) "*" else "")),
+              tags$td(paste0("[", fmt(t$apc_ic_inf[i]), "; ", fmt(t$apc_ic_sup[i]), "]")),
+              tags$td(sentido))
+    })
+    tags$table(class = "table table-sm", style = "max-width: 640px; margin-top: 12px;",
+               tags$thead(tags$tr(tags$th("Período"), tags$th("APC (% ao ano)"), tags$th("IC 95%"), tags$th("Tendência"))),
+               tags$tbody(linhas))
+  })
+  output$nota_tend <- renderUI({
+    r <- tend()
+    aviso <- if (!is.null(r$t)) stats::na.omit(unique(r$t$aviso)) else character()
+    nota_doenca(r$doenca, c(if (length(aviso)) paste(aviso, collapse = " "),
+                            "* IC 95% não contém o zero."))
+  })
+
   #Série temporal----
   serie <- eventReactive(input$update_st, {
     doenca <- validar(input$doenca_st, escolhas_doenca)
@@ -200,7 +259,11 @@ server <- function(input, output, session) {
       ) |>
       addLegend(pal = pal, values = valor, opacity = 0.75, position = "bottomright",
                 title = if (absoluto) "Casos" else "Por 100 mil hab.",
-                labFormat = labelFormat(big.mark = "."))
+                labFormat = function(type, cuts, p) {
+                  # labelFormat(big.mark = ".") conflita com o ponto decimal padrão
+                  d <- if (absoluto) 0 else 2
+                  paste0(formatar_numero(utils::head(cuts, -1), d), " – ", formatar_numero(cuts[-1], d))
+                })
   })
   output$nota_map <- renderUI({
     r <- mapa()
