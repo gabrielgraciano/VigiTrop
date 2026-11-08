@@ -14,11 +14,12 @@
 # `definicoes`  nome -> expressão booleana. `confirmado` é obrigatória.
 #               `provavel` só existe onde a distinção faz sentido.
 #               `legado_tcc` reproduz a regra do TCC, para validação.
+# `padrao`      qual definição o app usa por padrão. Se omitido: `confirmado`.
 #
 # STATUS: regras escritas a partir dos dicionários do SINAN (embutidos no
 # PySUS 2.11.7) e do handoff. Todas conferidas contra a Tabela 1 do TCC nos
-# anos com população conhecida (2010, 2015, 2020, 2022, 2024), em 01/11/2026. O comando `inspecionar` mostra
-# as distribuições dessas colunas para conferir.
+# anos com população conhecida (2010, 2015, 2020, 2022, 2024), em 01/11/2026.
+# O comando `inspecionar` mostra as distribuições dessas colunas para conferir.
 #
 # Dados reais (catálogo do PySUS, 01/11/2026): TODAS as colunas vêm como
 # VARCHAR, inclusive NU_ANO e SG_UF (código IBGE: '35'); datas vêm como
@@ -90,11 +91,14 @@ doencas:
     codigo: CHAG
     nome: Doença de Chagas aguda
     tabela_legada: chagas
+    # Decisão (08/11/2026): manter os inconclusivos, como no TCC. Investigar
+    # depois: ver BACKLOG.md.
+    padrao: confirmado_ou_inconclusivo
     definicoes:
       confirmado: "CLASSI_FIN = '1'"
-      # Regra do TCC, reconstruída: confirmado + inconclusivo (8). Bate com a
-      # Tabela 1 em 2010, 2015, 2020 e 2022 (verificado em 01/11/2026).
-      legado_tcc: "CLASSI_FIN IN ('1','8')"
+      # Regra do TCC: confirmado + inconclusivo (8). Bate com a Tabela 1 em
+      # 2010, 2015, 2020 e 2022 (verificado em 01/11/2026).
+      confirmado_ou_inconclusivo: "CLASSI_FIN IN ('1','8')"
     notas: >
       O arquivo CHAG do SINAN é só de doença de Chagas AGUDA. O app antigo
       dizia apenas "Doença de Chagas". De 2007 a 2011 o arquivo só traz
@@ -136,12 +140,14 @@ doencas:
     nome: Leishmaniose visceral
     tabela_legada: leishmaniose_visceral
     colunas_codigo_extras: [ENTRADA]
+    # Decisão (08/11/2026): manter os inconclusivos, como no TCC. Ver BACKLOG.md.
+    padrao: confirmado_ou_inconclusivo
     definicoes:
       confirmado: "CLASSI_FIN = '1'"
       provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN <> '2'"
-      # TCC: confirmado + inconclusivo (8). Bate exato com a Tabela 1 em
-      # 2010, 2015, 2020 e 2022.
-      legado_tcc: "CLASSI_FIN IN ('1','8')"
+      # Regra do TCC: confirmado + inconclusivo (8). Bate exato com a
+      # Tabela 1 em 2010, 2015, 2020 e 2022.
+      confirmado_ou_inconclusivo: "CLASSI_FIN IN ('1','8')"
     notas: >
       ENTRADA: 1 caso novo, 2 recidiva, 3 transferência. Decidir se
       transferências saem da contagem (evita contar o mesmo caso duas vezes).
@@ -181,13 +187,15 @@ doencas:
     codigo: RAIV
     nome: Raiva humana
     tabela_legada: raiva_humana
+    # Decisão (08/11/2026): manter os inconclusivos, como no TCC. Investigar
+    # depois (aqui o efeito é grande): ver BACKLOG.md.
+    padrao: confirmado_ou_inconclusivo
     definicoes:
       confirmado: "CLASSI_FIN = '1'"
-      # Regra do TCC, reconstruída: confirmado + inconclusivo (8), como no
-      # README antigo. Bate com a Tabela 1 em 2010, 2015 e 2020 (verificado em
-      # 01/11/2026). Infla a raiva em 10 a 20 vezes: em 2018, 66 contra 11
-      # confirmados.
-      legado_tcc: "CLASSI_FIN IN ('1','8')"
+      # Regra do TCC: confirmado + inconclusivo (8), como no README antigo.
+      # Bate com a Tabela 1 em 2010, 2015 e 2020 (verificado em 01/11/2026).
+      # Dá de 10 a 20 vezes os confirmados: em 2018, 66 contra 11.
+      confirmado_ou_inconclusivo: "CLASSI_FIN IN ('1','8')"
     notas: >
       Confirmados: de 1 a 11 por ano. Mostrar casos, não taxa. O README antigo
       também descartava linhas sem NU_IDADE_N.

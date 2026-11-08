@@ -20,6 +20,7 @@ class Doenca:
     colunas_codigo: tuple[str, ...]
     colunas_data: tuple[str, ...]
     definicoes: dict[str, str]
+    padrao: str = "confirmado"  # definição que o app usa por padrão
     filtro: str | None = None
     notas: str | None = None
 
@@ -70,6 +71,9 @@ def carregar(caminho: Path | None = None) -> Config:
         definicoes = d.get("definicoes") or {}
         if "confirmado" not in definicoes:
             raise ValueError(f"{slug}: falta a definição 'confirmado'")
+        padrao = d.get("padrao", "confirmado")
+        if padrao not in definicoes:
+            raise ValueError(f"{slug}: padrao {padrao!r} não está em definicoes")
         doencas[slug] = Doenca(
             slug=slug,
             codigo=d["codigo"].upper(),
@@ -78,6 +82,7 @@ def carregar(caminho: Path | None = None) -> Config:
             colunas_codigo=_unicos(comuns_cod, d.get("colunas_codigo_extras")),
             colunas_data=_unicos(comuns_dt, d.get("colunas_data_extras")),
             definicoes=dict(definicoes),
+            padrao=padrao,
             filtro=d.get("filtro"),
             notas=(d.get("notas") or "").strip() or None,
         )

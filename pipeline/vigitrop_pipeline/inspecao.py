@@ -118,7 +118,8 @@ def inspecionar(pastas: Pastas, doencas: list[Doenca], anos: list[int] | None) -
         if d.filtro:
             md.append(f"Recorte: `{d.filtro}`  ")
         for nome, expr in d.definicoes.items():
-            md.append(f"Definição `{nome}`: `{expr}`  ")
+            marca = " **(padrão)**" if nome == d.padrao else ""
+            md.append(f"Definição `{nome}`{marca}: `{expr}`  ")
         md.append("")
 
         cab = ["ano", "status", "total", "recorte", *d.definicoes]
