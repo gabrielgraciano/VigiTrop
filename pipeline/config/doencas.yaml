@@ -91,15 +91,20 @@ doencas:
     # Decisão (08/11/2026): padrão = casos prováveis (critério do Ministério e do TCC).
     padrao: provavel
     definicoes:
-      confirmado: "CLASSI_FIN = '13'"
-      provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN NOT IN ('5','10','11','12')"
+      # 2014 até meados de 2016 (SINAN NET): 1 confirmado, 2 descartado,
+      # 8 inconclusivo. Depois (SINAN online): 13 chikungunya, 5 descartado,
+      # 10-12 dengue. Corrigido em 08/11/2026: antes, 2015 só confirmava 665
+      # casos e o "provável" contava os descartados (2). Agora o provável de
+      # 2015 dá 18,69 por 100 mil, e o Ministério publica 18,7
+      # (docs/investigacao_definicoes.md, seção 2).
+      confirmado: "CLASSI_FIN IN ('1','13')"
+      provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN NOT IN ('2','5','10','11','12')"
       # TCC, aproximado: em 2022, 70,47 aqui contra 70,58 na Tabela 1. Os
       # arquivos foram revisados em 2026, então não dá para conferir exato.
       legado_tcc: "CLASSI_FIN = '13'"
     notas: >
-      PENDENTE: 2015 usa outra codificação (CLASSI_FIN 1, 2 e 8, e quase
-      nenhum 13), então "confirmado" sai quase zerado nesse ano. Conferir no
-      dicionário da época.
+      O TCC (CLASSI_FIN 13) subestimava 2014-2016. O valor de 2015 no TCC
+      (16,03) não sai de nenhuma combinação de códigos.
 
   chagas:
     codigo: CHAG
