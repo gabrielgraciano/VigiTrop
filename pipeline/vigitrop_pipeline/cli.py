@@ -37,17 +37,27 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=__version__)
 
     sub = p.add_subparsers(dest="comando", required=True)
-    ajuda = {
+    com_filtro = {
         "listar": "lista o que o catálogo do PySUS tem (anos FINAL/PRELIM), sem baixar",
         "baixar": "baixa os arquivos brutos para data/cache e atualiza data/bronze/manifesto.csv",
         "inspecionar": "relatório de schema e contagens por definição de caso (offline)",
+        "silver": "bruto -> data/silver/casos (um registro por notificação; incremental)",
     }
-    for nome, texto in ajuda.items():
+    sem_filtro = {
+        "populacao": "baixa a projeção do IBGE (revisão 2024) e gera data/gold/populacao.parquet",
+        "gold": "silver -> data/gold/casos.parquet + doencas, arquivos, meta",
+        "validar": "compara o gold com a Tabela 1 do TCC (data/relatorios/validacao_tcc.csv)",
+        "executar": "tudo, em ordem: baixar, populacao, silver, gold, validar",
+    }
+    for nome, texto in {**com_filtro, **sem_filtro}.items():
         s = sub.add_parser(nome, help=texto, description=texto)
-        s.add_argument("--doencas", nargs="+", metavar="DOENCA",
-                       help="códigos SINAN ou nomes do config (ex.: RAIV CHAG). Padrão: todas")
-        s.add_argument("--anos", type=_anos, metavar="ANOS",
-                       help="ex.: 2024 | 2007-2024 | 2019,2021-2023. Padrão: do ano_inicio do config em diante")
+        if nome in com_filtro:
+            s.add_argument("--doencas", nargs="+", metavar="DOENCA",
+                           help="códigos SINAN ou nomes do config (ex.: RAIV CHAG). Padrão: todas")
+            s.add_argument("--anos", type=_anos, metavar="ANOS",
+                           help="ex.: 2024 | 2007-2024 | 2019,2021-2023. Padrão: do ano_inicio do config em diante")
+        if nome in ("silver", "populacao"):
+            s.add_argument("--forcar", action="store_true", help="refaz mesmo sem mudança")
     return p
 
 
@@ -62,30 +72,46 @@ def _erro_de_rede(e: BaseException | None) -> bool:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     cfg = carregar(args.config)
-    doencas = cfg.selecionar(args.doencas)
+    doencas = cfg.selecionar(getattr(args, "doencas", None))
+    anos = getattr(args, "anos", None)
+    forcar = getattr(args, "forcar", False)
+    todas = list(cfg.doencas.values())
 
     pastas = Pastas(args.dados)
     pastas.criar()
     arquivo_log = configurar_log(pastas, args.comando)
     configurar_pysus(pastas)
     log.info("vigitrop_pipeline %s | %s | doenças: %s | anos: %s", __version__, args.comando,
-             " ".join(d.codigo for d in doencas), args.anos or f">= {cfg.ano_inicio}")
+             " ".join(d.codigo for d in doencas), anos or f">= {cfg.ano_inicio}")
 
     try:
-        if args.comando == "listar":
+        c = args.comando
+        if c == "listar":
             from .catalogo import listar
-            listar(pastas, doencas, args.anos, cfg.ano_inicio)
-        elif args.comando == "baixar":
+            listar(pastas, doencas, anos, cfg.ano_inicio)
+        if c in ("baixar", "executar"):
             from .catalogo import baixar
-            baixar(pastas, doencas, args.anos, cfg.ano_inicio)
-        elif args.comando == "inspecionar":
+            baixar(pastas, doencas, anos, cfg.ano_inicio)
+        if c == "inspecionar":
             from .inspecao import inspecionar
-            inspecionar(pastas, doencas, args.anos)
+            inspecionar(pastas, doencas, anos)
+        if c in ("populacao", "executar"):
+            from . import populacao
+            populacao.gerar(pastas, cfg.populacao_url, forcar)
+        if c in ("silver", "executar"):
+            from . import silver
+            silver.gerar(pastas, todas, doencas, anos, forcar)
+        if c in ("gold", "executar"):
+            from . import gold
+            gold.gerar(pastas, cfg)
+        if c in ("validar", "executar"):
+            from .validacao import validar
+            validar(pastas, cfg)
     except SystemExit:
         raise
     except Exception as e:
         log.exception("Falhou. Log completo em %s", arquivo_log)
-        if args.comando in ("listar", "baixar") and _erro_de_rede(e):
+        if args.comando in ("listar", "baixar", "executar") and _erro_de_rede(e):
             log.error("Se o erro for de rede/proxy: o catálogo do PySUS fica em "
                       "https://nbg1.your-objectstorage.com/pysus/ (precisa de HTTPS liberado para esse host).")
         return 1

@@ -5,3 +5,4 @@ pysus==2.11.7
 duckdb
 pyarrow
 PyYAML
+openpyxl     # lê a planilha de população do IBGE

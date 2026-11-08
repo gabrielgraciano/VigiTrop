@@ -22,9 +22,14 @@ Na raiva, o Ministério da Saúde divulga 11 casos em 2018, o mesmo número dos 
 - Se o app deve mostrar as duas contagens, e qual delas como padrão.
 - Decidir com a orientadora.
 
+## Decisões tomadas
+
+- **Inconclusivos (08/11/2026):** ficam na contagem padrão de raiva, Chagas e leishmaniose visceral. A investigação continua aberta (seção acima).
+- **Hanseníase (08/11/2026):** o padrão é casos novos (`MODOENTR = 1`, sem erro diagnóstico), o indicador oficial. O TCC contava todas as notificações, cerca de 30% a mais. A contagem antiga continua no gold como `legado_tcc`.
+
 ## Outras pendências já levantadas
 
-- **Hanseníase.** O TCC contou todas as notificações. O indicador oficial conta só casos novos (`MODOENTR = 1`, sem erro diagnóstico), o que dá uns 30% a menos. Hoje o padrão é o oficial; decidir.
+- **Dengue e chikungunya: qual o padrão?** Hoje é "confirmado". O TCC e o Ministério usam "casos prováveis" (todas as notificações menos as descartadas, com os inconclusivos). Na dengue, o TCC contou o arquivo inteiro, que já vem sem descartados. Decidir; as duas contagens já estão no gold.
 - **Chikungunya 2015.** Usa outra codificação de `CLASSI_FIN` (1, 2 e 8, quase sem 13), então "confirmado" sai quase zerado nesse ano. Conferir no dicionário da época.
 - **Serpente.** Decidir se entram as não peçonhentas (`ANI_SERPEN = 5`) e as de tipo ignorado (`9`).
 - **Leishmanioses.** Decidir se transferências (`ENTRADA` / `CLA_TIPO_N = 3`) saem da contagem.

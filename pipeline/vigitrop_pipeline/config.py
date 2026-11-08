@@ -29,6 +29,7 @@ class Doenca:
 class Config:
     ano_inicio: int
     doencas: dict[str, Doenca] = field(default_factory=dict)
+    populacao_url: str = ""
 
     def selecionar(self, nomes: list[str] | None) -> list[Doenca]:
         """Aceita slug ('raiva_humana') ou código SINAN ('RAIV'), sem caixa."""
@@ -86,4 +87,8 @@ def carregar(caminho: Path | None = None) -> Config:
             filtro=d.get("filtro"),
             notas=(d.get("notas") or "").strip() or None,
         )
-    return Config(ano_inicio=int(bruto.get("ano_inicio", 2007)), doencas=doencas)
+    return Config(
+        ano_inicio=int(bruto.get("ano_inicio", 2007)),
+        doencas=doencas,
+        populacao_url=(bruto.get("populacao") or {}).get("url", ""),
+    )

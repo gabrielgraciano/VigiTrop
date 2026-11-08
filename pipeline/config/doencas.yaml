@@ -29,6 +29,11 @@
 
 ano_inicio: 2007
 
+# Denominador: projeção do IBGE, revisão 2024 (UF × sexo × idade simples,
+# 2000-2070). É o mesmo do TCC (bate exato com `populacao_brasil` do dump).
+populacao:
+  url: https://ftp.ibge.gov.br/Projecao_da_Populacao/Projecao_da_Populacao_2024/projecoes_2024_tab1_idade_simples.xlsx
+
 # Colunas da ficha de notificação, presentes (em princípio) em todos os agravos.
 colunas_codigo_comuns:
   - NU_ANO       # ano da notificação

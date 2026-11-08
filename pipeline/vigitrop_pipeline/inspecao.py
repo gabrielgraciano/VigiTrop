@@ -21,58 +21,13 @@ import duckdb
 from .ambiente import Pastas
 from .catalogo import ler_manifesto
 from .config import Doenca
+from .normalizacao import abrir
+from .normalizacao import q as _q
 
 log = logging.getLogger("vigitrop.inspecao")
 
-INTEIROS = {"TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT", "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT"}
-DECIMAIS = ("FLOAT", "DOUBLE", "REAL", "DECIMAL")
-
 # Quantos valores distintos mostrar por coluna (padrão: 15)
 LIMITE_VALORES = {"SG_UF": 30, "SG_UF_NOT": 30, "NU_ANO": 25, "SEM_PRI": 10, "SEM_NOT": 10, "NU_IDADE_N": 10, "ID_MN_RESI": 5}
-
-
-def _q(nome: str) -> str:
-    return '"' + nome.replace('"', '""') + '"'
-
-
-def expr_codigo(coluna: str, tipo: str) -> str:
-    """Expressão SQL que normaliza um código para VARCHAR limpo."""
-    t = tipo.upper()
-    if t in INTEIROS:
-        return f"CAST({_q(coluna)} AS VARCHAR)"
-    if t.startswith(DECIMAIS):
-        return f"CAST(TRY_CAST({_q(coluna)} AS BIGINT) AS VARCHAR)"
-    return f"NULLIF(TRIM(CAST({_q(coluna)} AS VARCHAR)), '')"
-
-
-def abrir(con: duckdb.DuckDBPyConnection, caminho: Path, doenca: Doenca) -> tuple[dict[str, str], list[str]]:
-    """Cria as views `bruto` e `norm` para um arquivo.
-
-    Retorna (schema bruto {coluna: tipo}, colunas configuradas que faltam).
-    """
-    rel = con.read_parquet(str(caminho))
-    rel.create_view("bruto", replace=True)
-    schema = {c: str(t) for c, t in zip(rel.columns, rel.types)}
-    por_maiuscula = {c.upper(): c for c in schema}
-
-    selecoes: list[str] = []
-    ausentes: list[str] = []
-    for col in doenca.colunas_codigo:
-        real = por_maiuscula.get(col)
-        if real is None:
-            ausentes.append(col)
-            selecoes.append(f"NULL::VARCHAR AS {_q(col)}")
-        else:
-            selecoes.append(f"{expr_codigo(real, schema[real])} AS {_q(col)}")
-    for col in doenca.colunas_data:
-        real = por_maiuscula.get(col)
-        if real is None:
-            ausentes.append(col)
-            selecoes.append(f"NULL::VARCHAR AS {_q(col)}")
-        else:
-            selecoes.append(f"{_q(real)} AS {_q(col)}")
-    con.execute(f"CREATE OR REPLACE TEMP VIEW norm AS SELECT {', '.join(selecoes)} FROM bruto")
-    return schema, ausentes
 
 
 def contar(con: duckdb.DuckDBPyConnection, doenca: Doenca) -> dict[str, int]:
