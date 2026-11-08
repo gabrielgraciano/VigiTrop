@@ -61,6 +61,8 @@ doencas:
     codigo: DENG
     nome: Dengue
     tabela_legada: dengue
+    # Decisão (08/11/2026): padrão = casos prováveis (critério do Ministério e do TCC).
+    padrao: provavel
     definicoes:
       # Classificação antiga (até 2013): 1 clássico, 2 com complicações,
       # 3 FHD, 4 SCD. Nova (2014+): 10 dengue, 11 com sinais de alarme,
@@ -81,6 +83,8 @@ doencas:
     codigo: CHIK
     nome: Febre chikungunya
     tabela_legada: febre_chikungunya
+    # Decisão (08/11/2026): padrão = casos prováveis (critério do Ministério e do TCC).
+    padrao: provavel
     definicoes:
       confirmado: "CLASSI_FIN = '13'"
       provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN NOT IN ('5','10','11','12')"
