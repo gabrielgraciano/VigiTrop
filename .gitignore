@@ -33,3 +33,6 @@ rsconnect/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Worktrees temporários do Claude Code (subagentes)
+.claude/worktrees/
