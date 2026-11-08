@@ -8,7 +8,10 @@
 #   docker compose run --rm pipeline executar     # baixar, populacao, silver, gold, validar
 #   docker compose run --rm pipeline --help        # outros comandos (ver pipeline/README.md)
 #
-# O serviço `app` (Shiny lendo data/gold via DuckDB) entra na fase 2.
+# App (Shiny lendo data/gold via DuckDB; sem MySQL):
+#   docker compose up -d --build app               # http://localhost:3838
+#   docker compose logs -f app
+# Porta no host: VIGITROP_PORTA (padrão 3838; na VM, 2103 para teste e 2102 em produção).
 
 name: vigitrop
 
@@ -21,3 +24,14 @@ services:
       - ./data:/data
     environment:
       TZ: America/Sao_Paulo
+
+  app:
+    build: ./shiny
+    image: vigitrop-app
+    ports:
+      - "${VIGITROP_PORTA:-3838}:3838"
+    volumes:
+      - ./data/gold:/srv/dados/gold:ro
+    environment:
+      SHINY_LOG_STDERR: "1"  # logs do app em `docker compose logs`
+    restart: unless-stopped

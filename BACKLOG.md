@@ -31,6 +31,10 @@ Na raiva, o Ministério da Saúde divulga 11 casos em 2018, o mesmo número dos 
 
 ## Outras pendências já levantadas
 
+- **Mesclar a versão de produção do app.** O app novo partiu do código do repo. A versão em produção (`export/app_from_container/`, no PC do Gabriel) tem textos e mensagens um pouco diferentes, além do `serie_temporal.R`. Fazer um merge de três vias: base = commit `ffc6a09`, a produção (sem o `server_sql.R`, que tem a senha) e o app novo.
+- **Deploy na VM: caminho da URL.** O app antigo ficava em `/srv/shiny-server/app_ec`. O novo responde em `/` e em `/app_ec/`. Confirmar para onde o proxy de `vigitrop.unifesp.br` aponta.
+- **Aba Tendência.** Continua com o PNG estático do Joinpoint (fase 4: recalcular a cada atualização).
+- **Definição alternativa no app.** O gold já tem todas as contagens (confirmados, prováveis, regra do TCC). O app mostra só a padrão de cada doença; dá para oferecer a troca na interface.
 - **Chikungunya 2015.** Usa outra codificação de `CLASSI_FIN` (1, 2 e 8, quase sem 13), então "confirmado" sai quase zerado nesse ano. Conferir no dicionário da época.
 - **Serpente.** Decidir se entram as não peçonhentas (`ANI_SERPEN = 5`) e as de tipo ignorado (`9`).
 - **Leishmanioses.** Decidir se transferências (`ENTRADA` / `CLA_TIPO_N = 3`) saem da contagem.

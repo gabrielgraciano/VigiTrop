@@ -1,31 +1,4 @@
-library(shiny)
-library(bslib)
-library(shinyWidgets)
-library(ggplot2)
-library(dplyr)
-library(plotly)
-library(RMySQL)
-library(leaflet)
-library(sf)
-library(rmapshaper)
-library(highcharter)
-library(gganimate)#para corrida de barras
-library(transformr)#para corrida de barras
-library(gifski)#para corrida de barras
-library(jsonlite)#para corrida de barras
-library(shinyjs)
-library(png)
-
-source('sobre_projeto.R')
-source("inputs.R")
-source('cards.R')
-source('server_sql.R')
-source('sobre_dtns.R')
-source('dtns_brasil.R')
-source('tendencia.R')
-#source('serie_temporal.R')
-#source("app_dengue/serie_temporal.R")
-
+# Bibliotecas, dados e inputs: ver global.R (carregado antes deste arquivo).
 
 ui <- page_navbar(
   title = 'VigiTrop',
@@ -35,8 +8,6 @@ ui <- page_navbar(
             page_sidebar(
               
               sidebar = list(
-                useShinyjs(), 
-                 
                 conditionalPanel(
                   condition = "input.navset == 'Mapas'",
                   selecionar_doenca_map,
@@ -76,8 +47,7 @@ ui <- page_navbar(
                 conditionalPanel(
                   condition = "input.navset == 'Animação - barras'",
                   selecionar_doenca_br,
-                  #selecionar_uf,
-                  tipo_mapa,
+                  tipo_br,
                   botao_br
                 ),
                 
@@ -98,12 +68,6 @@ ui <- page_navbar(
                 
                 
               ),
-              tags$div(id = "loading", style = "display:none;", class = "modal", 
-                       tags$div(class = "modal-content", 
-                                tags$h4("Gerando Gráfico..."), 
-                                tags$p("Por favor, aguarde."))),
-              
-              
             )),
   nav_panel(title = 'Tendência', div(tendencia)),
   nav_panel(title = 'Sobre o Projeto', div(sobre_projeto_texto)),

@@ -55,7 +55,7 @@ O app lê só estes arquivos, via DuckDB. Juntos ocupam cerca de 1,3 MB.
 |---|---|
 | `casos.parquet` | `doenca`, `definicao`, `ano`, `uf`, `sexo`, `faixa_etaria`, `raca`, `casos` |
 | `populacao.parquet` | `ano`, `uf`, `sexo`, `faixa_etaria`, `populacao` (2000-2070) |
-| `doencas.parquet` | `doenca`, `codigo`, `nome`, `definicao`, `expressao`, `padrao`, `filtro`, `notas` |
+| `doencas.parquet` | `doenca`, `codigo`, `nome`, `definicao`, `expressao`, `padrao`, `filtro`, `notas`, `texto_app` |
 | `arquivos.parquet` | `doenca`, `codigo`, `ano`, `status` (FINAL/PRELIM), `data_coleta`, `linhas`, `aviso` |
 | `meta.json` | data de geração, versões, fontes, ano de referência |
 

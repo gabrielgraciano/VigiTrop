@@ -9,7 +9,7 @@ data/gold/
                      - uma linha conta em todas as definições que satisfaz; o app filtra
                        `definicao` (padrão em doencas.parquet)
   populacao.parquet  gerado por populacao.py
-  doencas.parquet    doenca, codigo, nome, definicao, expressao, padrao, filtro, notas
+  doencas.parquet    doenca, codigo, nome, definicao, expressao, padrao, filtro, notas, texto_app
   arquivos.parquet   doenca, codigo, ano, status (FINAL/PRELIM), data_coleta, linhas, aviso
   meta.json          data de geração, versões, fontes
 """
@@ -83,13 +83,13 @@ def gerar(pastas: Pastas, cfg: Config) -> None:
         ORDER BY doenca, definicao, ano, uf, sexo, faixa_etaria, raca""", g / "casos.parquet")
 
     linhas_def = [
-        (d.slug, d.codigo, d.nome, nome, expr, nome == d.padrao, d.filtro, d.notas)
+        (d.slug, d.codigo, d.nome, nome, expr, nome == d.padrao, d.filtro, d.notas, d.texto_app)
         for d in cfg.doencas.values()
         for nome, expr in d.definicoes.items()
     ]
     con.execute("CREATE TABLE defs (doenca VARCHAR, codigo VARCHAR, nome VARCHAR, definicao VARCHAR, "
-                "expressao VARCHAR, padrao BOOLEAN, filtro VARCHAR, notas VARCHAR)")
-    con.executemany("INSERT INTO defs VALUES (?, ?, ?, ?, ?, ?, ?, ?)", linhas_def)
+                "expressao VARCHAR, padrao BOOLEAN, filtro VARCHAR, notas VARCHAR, texto_app VARCHAR)")
+    con.executemany("INSERT INTO defs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", linhas_def)
     _copiar(con, "SELECT * FROM defs", g / "doencas.parquet")
 
     con.execute("CREATE TABLE arqs (doenca VARCHAR, codigo VARCHAR, ano SMALLINT, status VARCHAR, "

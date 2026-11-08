@@ -5,21 +5,33 @@ Projeto realizado nas disciplinas de Estágio Curricular I e II do curso de Biom
 #### O que é?
 O VigiTrop é uma ferramenta que busca unir ferramentas de análise descritiva para 9 doenças tropicais negligenciadas. 
 
-#### Como foi feito?
-A interface foi construída na linguagem R, os dados foram baixados via Python e são armazenados em um servidor MySQL
+#### Como funciona?
+Os microdados do SINAN são baixados pelo PySUS, e a população vem da projeção do IBGE. Um pipeline em Python (DuckDB) organiza tudo em arquivos parquet, que o app em R/Shiny lê diretamente. Não há banco de dados. Tudo roda em Docker.
 
 #### Quais doenças são tratadas na aplicação?
-Dengue, doença de Chagas, esquistossomose, envenenamento por picada de cobra, febre chikungunya, hanseníase, leishmaniose visceral, leishmaniose tegumentar americana e raiva humana.
+Dengue, doença de Chagas (aguda), esquistossomose, envenenamento por picada de cobra, febre chikungunya, hanseníase, leishmaniose visceral, leishmaniose tegumentar americana e raiva humana.
 
 Fluxograma da aplicação:
 
 ```mermaid
 graph TD;
-    Script_Python-->Dados;
-    Dados-->MySQL_server;
-    MySQL_server-->Shiny_app;
+    SINAN/DataSUS_via_PySUS-->Pipeline_Python;
+    Projecao_IBGE_2024-->Pipeline_Python;
+    Pipeline_Python-->data/gold_parquet;
+    data/gold_parquet-->Shiny_app_DuckDB;
 ```
 
+## Como rodar (Docker)
+
+```bash
+docker compose build pipeline
+docker compose run --rm pipeline executar   # baixa e prepara os dados em data/ (~0,8 GB na 1ª vez)
+docker compose up -d --build app            # app em http://localhost:3838
+```
+
+- `pipeline/`: coleta e preparo dos dados. Ver [`pipeline/README.md`](pipeline/README.md).
+- `shiny/`: o app. Lê `data/gold`; os cálculos ficam em `shiny/dados.R`.
+- `BACKLOG.md`: decisões tomadas e questões em aberto.
 
 ## Reprodutibilidade
 

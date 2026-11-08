@@ -15,6 +15,7 @@
 #               `provavel` só existe onde a distinção faz sentido.
 #               `legado_tcc` reproduz a regra do TCC, para validação.
 # `padrao`      qual definição o app usa por padrão. Se omitido: `confirmado`.
+# `texto_app`   o que o app mostra sobre a contagem padrão (definição e ressalvas).
 #
 # STATUS: regras escritas a partir dos dicionários do SINAN (embutidos no
 # PySUS 2.11.7) e do handoff. Todas conferidas contra a Tabela 1 do TCC nos
@@ -60,6 +61,8 @@ doencas:
   dengue:
     codigo: DENG
     nome: Dengue
+    texto_app: >
+      Casos prováveis: todas as notificações, exceto as descartadas (critério do Ministério da Saúde).
     tabela_legada: dengue
     # Decisão (08/11/2026): padrão = casos prováveis (critério do Ministério e do TCC).
     padrao: provavel
@@ -82,6 +85,8 @@ doencas:
   chikungunya:
     codigo: CHIK
     nome: Febre chikungunya
+    texto_app: >
+      Casos prováveis: todas as notificações, exceto as descartadas (critério do Ministério da Saúde).
     tabela_legada: febre_chikungunya
     # Decisão (08/11/2026): padrão = casos prováveis (critério do Ministério e do TCC).
     padrao: provavel
@@ -99,6 +104,8 @@ doencas:
   chagas:
     codigo: CHAG
     nome: Doença de Chagas aguda
+    texto_app: >
+      Doença de Chagas aguda (o SINAN não registra a forma crônica). Casos confirmados e inconclusivos (classificação final 1 ou 8), como no TCC.
     tabela_legada: chagas
     # Decisão (08/11/2026): manter os inconclusivos, como no TCC. Investigar
     # depois: ver BACKLOG.md.
@@ -117,6 +124,8 @@ doencas:
   esquistossomose:
     codigo: ESQU
     nome: Esquistossomose
+    texto_app: >
+      Todas as notificações (a notificação exige exame positivo). Em área endêmica, os casos de rotina são registrados no SISPCE, não no SINAN: os números refletem sobretudo áreas não endêmicas e formas graves.
     tabela_legada: esquistossomose
     colunas_codigo_extras: [FORMA, TPAUTOCTO]
     definicoes:
@@ -130,6 +139,8 @@ doencas:
   hanseniase:
     codigo: HANS
     nome: Hanseníase
+    texto_app: >
+      Casos novos (modo de entrada = caso novo), sem os encerrados por erro diagnóstico: o indicador oficial de detecção.
     tabela_legada: hanseniase
     colunas_codigo_extras: [MODOENTR, TPALTA_N, CLASSOPERA, FORMACLINI]
     colunas_data_extras: [DT_DIAG]
@@ -147,6 +158,8 @@ doencas:
   leishmaniose_visceral:
     codigo: LEIV
     nome: Leishmaniose visceral
+    texto_app: >
+      Casos confirmados e inconclusivos (classificação final 1 ou 8), como no TCC.
     tabela_legada: leishmaniose_visceral
     colunas_codigo_extras: [ENTRADA]
     # Decisão (08/11/2026): manter os inconclusivos, como no TCC. Ver BACKLOG.md.
@@ -164,6 +177,8 @@ doencas:
   leishmaniose_tegumentar:
     codigo: LTAN
     nome: Leishmaniose tegumentar americana
+    texto_app: >
+      Todas as notificações (só casos confirmados são notificados).
     tabela_legada: leishmaniose_tegumentar
     colunas_codigo_extras: [CLA_TIPO_N, CLAS_FORMA]
     definicoes:
@@ -177,6 +192,8 @@ doencas:
   envenenamento_serpente:
     codigo: ANIM
     nome: Envenenamento por picada de cobra
+    texto_app: >
+      Acidentes por serpente, inclusive com serpentes não peçonhentas e de tipo ignorado.
     tabela_legada: envenenamento_picada
     colunas_codigo_extras: [TP_ACIDENT, ANI_SERPEN, TRA_CLASSI]
     # O arquivo ANIM tem todos os animais peçonhentos: fica só serpente.
@@ -195,6 +212,8 @@ doencas:
   raiva_humana:
     codigo: RAIV
     nome: Raiva humana
+    texto_app: >
+      Casos confirmados e inconclusivos (classificação final 1 ou 8), como no TCC. Só os confirmados são de 1 a 11 por ano.
     tabela_legada: raiva_humana
     # Decisão (08/11/2026): manter os inconclusivos, como no TCC. Investigar
     # depois (aqui o efeito é grande): ver BACKLOG.md.

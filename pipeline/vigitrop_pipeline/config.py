@@ -23,6 +23,7 @@ class Doenca:
     padrao: str = "confirmado"  # definição que o app usa por padrão
     filtro: str | None = None
     notas: str | None = None
+    texto_app: str | None = None  # texto para o usuário do app
 
 
 @dataclass(frozen=True)
@@ -86,6 +87,7 @@ def carregar(caminho: Path | None = None) -> Config:
             padrao=padrao,
             filtro=d.get("filtro"),
             notas=(d.get("notas") or "").strip() or None,
+            texto_app=(d.get("texto_app") or "").strip() or None,
         )
     return Config(
         ano_inicio=int(bruto.get("ano_inicio", 2007)),

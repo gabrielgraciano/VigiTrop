@@ -34,8 +34,13 @@ def pasta_casos(pastas: Pastas) -> Path:
     return pastas.raiz / "silver" / "casos"
 
 
+# Campos da doença que mudam o conteúdo da silver (textos e `padrao` não mudam).
+_CAMPOS_SILVER = ("slug", "codigo", "colunas_codigo", "colunas_data", "definicoes", "filtro")
+
+
 def _assinatura(doenca: Doenca, todas: list[str]) -> str:
-    bruto = json.dumps({"v": SILVER_VERSAO, "doenca": dataclasses.asdict(doenca), "definicoes": todas}, sort_keys=True)
+    campos = {k: v for k, v in dataclasses.asdict(doenca).items() if k in _CAMPOS_SILVER}
+    bruto = json.dumps({"v": SILVER_VERSAO, "doenca": campos, "definicoes": todas}, sort_keys=True)
     return hashlib.sha256(bruto.encode()).hexdigest()[:16]
 
 
