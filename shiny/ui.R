@@ -91,7 +91,11 @@ ui <- page_navbar(
              target = "_blank",
              tags$span(icon("github"), " GitHub")
            )),
-           nav_item('link_tcc')),
+           nav_item(tags$a(
+             href = "https://docs.google.com/document/d/1itiFIu9HJICnXQ1I_BfNNt_yYbgqIUq59f2gQVqjrMU/edit?usp=sharing",
+             target = "_blank",
+             tags$span(icon("file-text"), " TCC")
+           ))),
   tags$head(
     tags$link(rel = "shortcut icon", href = "favicon.ico")
   ),

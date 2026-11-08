@@ -21,11 +21,11 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 - **Hanseníase (08/11/2026):** o padrão é casos novos (`MODOENTR = 1`, sem erro diagnóstico), o indicador oficial. O TCC contava todas as notificações, cerca de 30% a mais. A contagem antiga continua no gold como `legado_tcc`.
 - **Dengue e chikungunya (08/11/2026):** o padrão é casos prováveis (notificações menos as descartadas, inconclusivos incluídos), como o Ministério e o TCC. Os confirmados continuam no gold.
 - **Chikungunya 2014-2016 (08/11/2026, correção):** até meados de 2016 a ficha usava 1 = confirmado e 2 = descartado. A regra antiga só confirmava 665 casos em 2015 e contava os descartados como prováveis. Corrigido: o provável de 2015 dá 18,69 por 100 mil, e o Ministério publica 18,7. O valor do TCC para 2015 (16,03) não sai de nenhuma combinação de códigos.
+- **Versão de produção (08/11/2026):** comparada com o repo (`export/app_from_container`, copiada da VM em 31/08/2026). Os textos das abas e a lógica são iguais. Diferenças: o link "TCC" no menu, que foi incorporado; a aba "Animação - barras" desligada, que continua ligada no app novo porque a animação agora roda no navegador; e o `serie_temporal.R`, um rascunho de depuração não usado e com `browser()`, que não foi trazido.
 - **Tendência (08/11/2026):** é recalculada pelo pipeline (joinpoint por BIC) e aparece na aba Tendência. A tabela do TCC fica como referência.
 
 ## Outras pendências
 
-- **Mesclar a versão de produção do app.** O app novo partiu do código do repo. A versão em produção (`export/app_from_container/`, no PC do Gabriel) tem textos e mensagens um pouco diferentes, além do `serie_temporal.R`. Fazer um merge de três vias: base = commit `ffc6a09`, a produção (sem o `server_sql.R`, que tem a senha) e o app novo.
 - **Deploy na VM: caminho da URL.** O app antigo ficava em `/srv/shiny-server/app_ec`. O novo responde em `/` e em `/app_ec/`. Confirmar para onde o proxy de `vigitrop.unifesp.br` aponta.
 - **Definição alternativa no app.** O gold já tem todas as contagens (confirmados, prováveis, regra do TCC). O app mostra só a padrão de cada doença; dá para oferecer a troca na interface.
 - **Validação contra o dump.** Comparar com as tabelas `notifications_*` do MySQL antigo.
