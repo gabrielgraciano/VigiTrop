@@ -1,5 +1,5 @@
 > Relatório de pesquisa de 08/11/2026 sobre as definições de caso. Só traz agregados e trechos dos dicionários.
-> As recomendações abaixo **ainda não foram aplicadas**, exceto a correção da chikungunya 2014–2016. As decisões ficam no `BACKLOG.md`.
+> Aplicado em 08/11/2026: correção da chikungunya 2014–2016; padrão só de confirmados em raiva, Chagas e LV (critério do Ministério); serpentes sem as não peçonhentas. O resto está no `BACKLOG.md`.
 
 # Investigação: definições de caso do VigiTrop
 

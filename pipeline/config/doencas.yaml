@@ -110,16 +110,16 @@ doencas:
     codigo: CHAG
     nome: Doença de Chagas aguda
     texto_app: >
-      Doença de Chagas aguda (o SINAN não registra a forma crônica). Casos confirmados e inconclusivos (classificação final 1 ou 8), como no TCC.
+      Doença de Chagas aguda (o SINAN não registra a forma crônica). Casos confirmados, critério do Ministério da Saúde.
     tabela_legada: chagas
-    # Decisão (08/11/2026): manter os inconclusivos, como no TCC. Investigar
-    # depois: ver BACKLOG.md.
-    padrao: confirmado_ou_inconclusivo
+    # Decisão (08/11/2026): padrão = só confirmados, como conta o Ministério da
+    # Saúde. O código 8 é encerramento automático por prazo, não diagnóstico
+    # (docs/investigacao_definicoes.md, seção 1).
     definicoes:
       confirmado: "CLASSI_FIN = '1'"
       # Regra do TCC: confirmado + inconclusivo (8). Bate com a Tabela 1 em
       # 2010, 2015, 2020 e 2022 (verificado em 01/11/2026).
-      confirmado_ou_inconclusivo: "CLASSI_FIN IN ('1','8')"
+      legado_tcc: "CLASSI_FIN IN ('1','8')"
     notas: >
       O arquivo CHAG do SINAN é só de doença de Chagas AGUDA. O app antigo
       dizia apenas "Doença de Chagas". De 2007 a 2011 o arquivo só traz
@@ -164,17 +164,18 @@ doencas:
     codigo: LEIV
     nome: Leishmaniose visceral
     texto_app: >
-      Casos confirmados e inconclusivos (classificação final 1 ou 8), como no TCC.
+      Casos confirmados, critério do Ministério da Saúde.
     tabela_legada: leishmaniose_visceral
     colunas_codigo_extras: [ENTRADA]
-    # Decisão (08/11/2026): manter os inconclusivos, como no TCC. Ver BACKLOG.md.
-    padrao: confirmado_ou_inconclusivo
+    # Decisão (08/11/2026): padrão = só confirmados, como conta o Ministério da
+    # Saúde. O código 8 é encerramento automático por prazo, não diagnóstico
+    # (docs/investigacao_definicoes.md, seção 1).
     definicoes:
       confirmado: "CLASSI_FIN = '1'"
       provavel: "CLASSI_FIN IS NULL OR CLASSI_FIN <> '2'"
       # Regra do TCC: confirmado + inconclusivo (8). Bate exato com a
       # Tabela 1 em 2010, 2015, 2020 e 2022.
-      confirmado_ou_inconclusivo: "CLASSI_FIN IN ('1','8')"
+      legado_tcc: "CLASSI_FIN IN ('1','8')"
     notas: >
       ENTRADA: 1 caso novo, 2 recidiva, 3 transferência. Decidir se
       transferências saem da contagem (evita contar o mesmo caso duas vezes).
@@ -198,37 +199,40 @@ doencas:
     codigo: ANIM
     nome: Envenenamento por picada de cobra
     texto_app: >
-      Acidentes por serpente, inclusive com serpentes não peçonhentas e de tipo ignorado.
+      Envenenamento por serpente: acidentes com serpentes peçonhentas ou de tipo não identificado. Picadas de serpente não peçonhenta ficam de fora, porque não causam envenenamento (a DTN da OMS é snakebite envenoming).
     tabela_legada: envenenamento_picada
     colunas_codigo_extras: [TP_ACIDENT, ANI_SERPEN, TRA_CLASSI]
     # O arquivo ANIM tem todos os animais peçonhentos: fica só serpente.
     filtro: "TP_ACIDENT = '1'"
     definicoes:
-      confirmado: "TRUE"
+      # Decisão (08/11/2026): sem serpente não peçonhenta (5), que não causa
+      # envenenamento; a DTN da OMS é snakebite envenoming. O tipo ignorado
+      # (9) fica: 41% receberam soro e houve 223 óbitos.
+      confirmado: "ANI_SERPEN IS NULL OR ANI_SERPEN <> '5'"
       # TCC, aproximado: só serpentes peçonhentas de tipo conhecido
       # (botrópico, crotálico, elapídico, laquético). Fica a ±3% da Tabela 1;
       # os arquivos foram revisados em 2025 e 2026.
       legado_tcc: "ANI_SERPEN IN ('1','2','3','4')"
     notas: >
-      DECIDIR: ANI_SERPEN 5 = não peçonhenta; 9 = tipo ignorado. Em 2010:
-      todas as serpentes 15,41/100 mil; sem as não peçonhentas 14,79;
-      só peçonhentas de tipo conhecido 13,09.
+      ANI_SERPEN 5 = não peçonhenta; 9 = tipo ignorado. Em 2010: todas as
+      serpentes 15,41/100 mil; sem as não peçonhentas 14,79; só peçonhentas
+      de tipo conhecido (regra do TCC) 13,09.
 
   raiva_humana:
     codigo: RAIV
     nome: Raiva humana
     texto_app: >
-      Casos confirmados e inconclusivos (classificação final 1 ou 8), como no TCC. Só os confirmados são de 1 a 11 por ano.
+      Casos confirmados, critério do Ministério da Saúde. São de 1 a 11 casos por ano: a incidência fica na casa de 0,00x por 100 mil.
     tabela_legada: raiva_humana
-    # Decisão (08/11/2026): manter os inconclusivos, como no TCC. Investigar
-    # depois (aqui o efeito é grande): ver BACKLOG.md.
-    padrao: confirmado_ou_inconclusivo
+    # Decisão (08/11/2026): padrão = só confirmados, como conta o Ministério da
+    # Saúde. O código 8 é encerramento automático por prazo, não diagnóstico
+    # (docs/investigacao_definicoes.md, seção 1).
     definicoes:
       confirmado: "CLASSI_FIN = '1'"
       # Regra do TCC: confirmado + inconclusivo (8), como no README antigo.
       # Bate com a Tabela 1 em 2010, 2015 e 2020 (verificado em 01/11/2026).
       # Dá de 10 a 20 vezes os confirmados: em 2018, 66 contra 11.
-      confirmado_ou_inconclusivo: "CLASSI_FIN IN ('1','8')"
+      legado_tcc: "CLASSI_FIN IN ('1','8')"
     notas: >
       Confirmados: de 1 a 11 por ano. Mostrar casos, não taxa. O README antigo
       também descartava linhas sem NU_IDADE_N.

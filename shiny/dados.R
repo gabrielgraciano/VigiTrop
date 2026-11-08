@@ -245,7 +245,7 @@ nota_doenca <- function(doenca, extra = NULL) {
   shiny::tags$small(
     class = "text-muted",
     shiny::tags$p(shiny::tags$b(paste0(nome_doenca(doenca), ": ")), padroes$texto_app[padroes$doenca == doenca]),
-    if (length(extra)) shiny::tags$p(extra),
+    if (length(extra)) shiny::tags$p(if (is.character(extra)) paste(extra, collapse = " ") else extra),
     shiny::tags$p(paste0(
       "Fonte: SINAN/DataSUS (via PySUS), coleta em ", coleta, ". ",
       "População: projeção IBGE, revisão 2024. Ano de notificação; UF de residência.",

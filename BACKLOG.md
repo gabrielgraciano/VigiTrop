@@ -6,37 +6,12 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 
 ## Para decidir: definições de caso (com recomendação da pesquisa)
 
-### Inconclusivos (`CLASSI_FIN = 8`) em raiva, Chagas e leishmaniose visceral
-
-**Hoje:** o padrão inclui os inconclusivos, como no TCC (decisão de 08/11/2026, pendente desta investigação). A contagem só de confirmados também está no gold.
-
-**O que a investigação achou:**
-- **O que é o código 8.** Não aparece em nenhum dicionário. Nos dados, marca o caso que ninguém encerrou no prazo:
-  - 95% a 99% estão sem critério de confirmação;
-  - 98% a 99,7% foram encerrados 61 dias ou mais depois da notificação (conferido de novo).
-- **Raiva:** nenhum dos 575 inconclusivos (2007-2021) tem data de óbito, numa doença com letalidade perto de 100%. Só 6 têm sinal clínico clássico, e nenhum tem exame positivo. O perfil é de exposição a animal, não de doença.
-  - Os confirmados batem com o Ministério: 11 em 2018 e 40 de 2010 a 2021.
-  - O código 8 some do arquivo a partir de 2022. Com a regra atual, a série cai de 52 (2021) para 2 (2022) por puro artefato, e a tendência do app mostra −64% ao ano de 2020 a 2024 por causa disso.
-- **Chagas aguda:** os arquivos de 2007-2011 só trazem confirmados. Com 1+8, a série salta de 190 para 723 em 2012; só com confirmados, fica 190 → 189.
-  - Os inconclusivos se espalham por RN, MG e BA, um perfil de Chagas crônica. 82% dos confirmados são do Pará.
-- **Leishmaniose visceral:** o peso do código 8 subiu de 6-10% para 16-22% desde 2023, o que suaviza a queda recente.
-- **Dengue e chik:** aqui o 8 entra corretamente nos prováveis, como o Ministério faz. Nada muda.
-
-**Recomendação:** o padrão passa a ser só confirmados (`CLASSI_FIN = 1`) nas três doenças, e 1+8 fica como contagem alternativa, ou só para comparação com o TCC. Decidir com a orientadora.
-
-### Serpentes: `ANI_SERPEN = 5` (não peçonhenta) e `9` (ignorado)
-
-- O código 5 é mordida sem envenenamento: só 5,7% recebem soro e 91% são leves. O peso dele triplicou (3,8% → 10,6%) e infla a tendência.
-- O código 9 tem 41% com soro e 223 óbitos: são envenenamentos de fato.
-
-**Recomendação:** padrão = `TP_ACIDENT = '1' AND ANI_SERPEN <> '5'`, mantendo o 9.
-
-### Transferências nas leishmanioses (`ENTRADA` / `CLA_TIPO_N = 3`)
+### Transferências nas leishmanioses (`ENTRADA` / `CLA_TIPO_N = 3`), aguardando ok do Gabriel
 
 - Pesam de 0,7% a 2,7% na LV e 0,5% na LTA. Na LV não há sinal de contagem dupla; na LTA, umas 100 duplicatas prováveis em 19 anos.
 - Achado à parte: a LTA conta hoje de 170 a 370 registros por ano encerrados como "mudança de diagnóstico", que não são LTA.
 
-**Recomendação:** excluir as transferências e, na LTA, os encerrados por mudança de diagnóstico.
+**Recomendação:** excluir as transferências e, na LTA, os encerrados por mudança de diagnóstico (`EVOLUCAO = 6`). Manter as recidivas por enquanto, até confirmar o indicador exato do Ministério (LV: 80 a 260 por ano; LTA: 750 a 1.300).
 
 ### Ano de referência (prioridade baixa)
 
@@ -47,7 +22,8 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 
 ## Decisões tomadas
 
-- **Inconclusivos (08/11/2026):** continuam na contagem padrão de raiva, Chagas e leishmaniose visceral, até a decisão acima.
+- **Inconclusivos (08/11/2026, revisto):** o padrão de raiva, Chagas e leishmaniose visceral passa a ser só confirmados (`CLASSI_FIN = 1`), como conta o Ministério. A pesquisa mostrou que o código 8 é encerramento automático por prazo, não diagnóstico (detalhes em `docs/investigacao_definicoes.md`, seção 1). Confirmados + inconclusivos continua no gold como `legado_tcc` (a regra do TCC). Raiva 2018: 11, igual ao Ministério. A queda artificial da tendência da raiva depois de 2021 sumiu.
+- **Serpentes (08/11/2026):** sem picada de serpente não peçonhenta (`ANI_SERPEN = 5`), que não causa envenenamento; a DTN da OMS é *snakebite envenoming*. O tipo ignorado (9) fica: 41% receberam soro e houve 223 óbitos.
 - **Hanseníase (08/11/2026):** o padrão é casos novos (`MODOENTR = 1`, sem erro diagnóstico), o indicador oficial. O TCC contava todas as notificações, cerca de 30% a mais. A contagem antiga continua no gold como `legado_tcc`.
 - **Dengue e chikungunya (08/11/2026):** o padrão é casos prováveis (notificações menos as descartadas, inconclusivos incluídos), como o Ministério e o TCC. Os confirmados continuam no gold.
 - **Chikungunya 2014-2016 (08/11/2026, correção):** até meados de 2016 a ficha usava 1 = confirmado e 2 = descartado. A regra antiga só confirmava 665 casos em 2015 e contava os descartados como prováveis. Corrigido: o provável de 2015 dá 18,69 por 100 mil, e o Ministério publica 18,7. O valor do TCC para 2015 (16,03) não sai de nenhuma combinação de códigos.
