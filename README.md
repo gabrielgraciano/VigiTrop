@@ -31,6 +31,7 @@ docker compose up -d --build app            # app em http://localhost:3838
 
 - `pipeline/`: coleta e preparo dos dados. Ver [`pipeline/README.md`](pipeline/README.md).
 - `shiny/`: o app. Lê `data/gold`; os cálculos ficam em `shiny/dados.R`.
+- `docs/deploy_vm.md`: passo a passo para colocar na VM da UNIFESP, com teste antes, volta atrás e atualização mensal (`scripts/atualizar_dados.sh`).
 - `BACKLOG.md`: decisões tomadas e questões em aberto.
 
 ## Reprodutibilidade
