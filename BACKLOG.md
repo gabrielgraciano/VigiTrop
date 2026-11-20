@@ -26,7 +26,7 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 
 ## Outras pendências
 
-- **Deploy na VM.** Guia em `docs/deploy_vm.md`. Falta: o diagnóstico da VM (acesso à internet e versão do docker compose), que decide se tudo roda na VM (caminho A) ou se as imagens vêm do PC (caminho B); a troca; e o cron mensal.
+- **Deploy na VM (20/11/2026).** O app está montado na VM e em teste na porta 2103. O pipeline não roda lá, porque a CPU virtual não tem x86-64-v2 (NumPy ≥ 2.4); ele roda no GitHub Actions e publica o gold como release. Falta: a troca para a porta 2102; o cron diário do `scripts/atualizar_da_release.sh`; e juntar a branch na `main`, para o agendamento mensal do Actions valer. Opcional: pedir à TI para trocar o tipo de CPU da VM.
 - **Deploy na VM: caminho da URL.** O app antigo ficava em `/srv/shiny-server/app_ec`. O novo responde em `/` e em `/app_ec/`. Confirmar para onde o proxy de `vigitrop.unifesp.br` aponta.
 - **Definição alternativa no app.** O gold já tem todas as contagens (confirmados, prováveis, regra do TCC). O app mostra só a padrão de cada doença; dá para oferecer a troca na interface.
 - **Validação contra o dump.** Comparar com as tabelas `notifications_*` do MySQL antigo.

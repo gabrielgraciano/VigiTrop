@@ -12,7 +12,13 @@ Como trocar o VigiTrop antigo (`shiny-app` + `mysql-test`) pelo novo (container 
 - Não mexer em `garu_vm` nem em `hardcore-colden`.
 - Os containers antigos só são **parados** (`docker stop`), nunca removidos, até o novo estar estável por alguns dias.
 
-Se o seu usuário não estiver no grupo `docker`, use `sudo` na frente dos comandos `docker`.
+Na VM (`vml249`), o docker exige `sudo`.
+
+**O pipeline não roda na VM** (diagnóstico de 20/11/2026). A CPU virtual é "Common KVM processor", sem SSE4.2/SSSE3 (x86-64-v2), e o PySUS 2.11.7 exige NumPy ≥ 2.4, que precisa dessas instruções. Por isso:
+- o pipeline roda no GitHub Actions (`.github/workflows/atualizar_dados.yml`) e publica o gold como release;
+- a VM só baixa o gold (`scripts/atualizar_da_release.sh`) e roda o app, que é em R e não tem esse problema.
+
+Para rodar o pipeline na VM, a TI teria de trocar o tipo de CPU da VM no Proxmox (por exemplo, "host" ou "x86-64-v2-AES"), o que exige reiniciar a VM.
 
 ## 0. Diagnóstico (só leitura)
 
@@ -42,19 +48,19 @@ git checkout claude/trusting-pasteur-bsuang   # ou main, depois do merge
 
 ## 2. Dados (gold)
 
-Na primeira vez, o mais rápido é copiar o gold que já foi gerado no PC. São cerca de 4 MB. No **PowerShell do PC**:
+O normal é baixar a release mais recente do GitHub:
+
+```bash
+sudo ~/vigitrop/scripts/atualizar_da_release.sh; tail -n 3 ~/vigitrop/data/logs/atualizacao_release.log
+```
+
+Outra opção é copiar o gold gerado no PC (cerca de 4 MB). Rode no **PowerShell do PC**, não na VM:
 
 ```powershell
 ssh gabrielgracianodias@172.22.29.19 "mkdir -p ~/vigitrop/data"
 scp -r C:\Users\gabir\tcc-vigitrop\vigitrop\data\gold gabrielgracianodias@172.22.29.19:~/vigitrop/data/
 ```
 
-No caminho A, dá também para gerar tudo na VM (cerca de 0,8 GB de download):
-
-```bash
-docker compose -p vigitrop build pipeline
-docker compose -p vigitrop run --rm pipeline executar
-```
 
 ## 3. Imagem do app
 
@@ -117,31 +123,32 @@ cd ~/vigitrop && docker compose -p vigitrop stop app
 docker start mysql-test shiny-app
 ```
 
-## 6. Atualização mensal (caminho A)
+## 6. Atualização mensal
 
-O script `scripts/atualizar_dados.sh`:
-1. roda o pipeline completo;
-2. se der certo, reinicia o app;
-3. se falhar, deixa o app no ar com os dados anteriores;
-4. grava o log em `data/logs/atualizacao_*.log`.
+**No GitHub:** o workflow "Atualizar dados" roda todo dia 3 e publica uma release `dados-AAAAMMDD-HHMM` com `gold.tar.gz`. O agendamento só vale a partir da branch `main`. Para rodar a qualquer hora, use o botão "Run workflow" na aba Actions.
 
-Ele também não roda duas vezes ao mesmo tempo.
+**Na VM:** o script `scripts/atualizar_da_release.sh`:
+1. confere todo dia se há release nova (baixa só o sha256, um arquivo minúsculo);
+2. se houver, baixa o gold, confere o checksum e o conteúdo, guarda o atual em `data/gold.anterior`, troca os arquivos e reinicia o app;
+3. se falhar, não troca nada.
 
-Primeiro, teste uma vez à mão:
+O log fica em `data/logs/atualizacao_release.log`.
 
-```bash
-~/vigitrop/scripts/atualizar_dados.sh && tail -n 5 ~/vigitrop/data/logs/atualizacao_*.log
-```
-
-Depois, agende para todo dia 5, às 3h17:
+Agende no cron do root, porque o docker exige `sudo`. A linha roda todo dia, às 4h17:
 
 ```bash
-crontab -e
+sudo crontab -e
 # acrescente a linha:
-17 3 5 * * /home/gabrielgracianodias/vigitrop/scripts/atualizar_dados.sh
+17 4 * * * /home/gabrielgracianodias/vigitrop/scripts/atualizar_da_release.sh
 ```
 
-Se o docker exigir `sudo`, agende no cron do root (`sudo crontab -e`) com a mesma linha.
+Para voltar ao gold anterior, se uma atualização trouxer algo estranho:
+
+```bash
+cd ~/vigitrop && sudo cp -a data/gold.anterior/. data/gold/ && sudo docker compose -p vigitrop restart app
+```
+
+Num computador com CPU moderna (o PC, ou a VM depois de trocar o tipo de CPU), dá para rodar o pipeline direto com `scripts/atualizar_dados.sh`.
 
 ## 7. Limpeza (só depois de alguns dias estável)
 
