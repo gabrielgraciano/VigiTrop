@@ -9,6 +9,11 @@ suppressPackageStartupMessages({
   library(highcharter)
 })
 
+# Sem cache do sass em disco: com / e /app_ec/, o shiny-server sobe processos R
+# separados que escreveriam no mesmo app_cache/sass ao mesmo tempo. Compilar o
+# CSS a cada processo leva menos de 1 s.
+options(sass.cache = FALSE)
+
 # Números no padrão brasileiro nos gráficos do highcharter
 local({
   lang <- getOption("highcharter.lang")

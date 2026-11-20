@@ -20,8 +20,13 @@ RUN echo "VIGITROP_GOLD=/srv/dados/gold" >> /usr/local/lib/R/etc/Renviron.site
 # Escuta em IPv4 explícito (o padrão [::] falha em redes Docker sem IPv6).
 # O app responde em / e também em /app_ec/, caminho do app na VM antiga
 # (para o caso de o proxy de vigitrop.unifesp.br apontar para ele).
+# preserve_logs: guarda o log de cada processo R (sem isso, o erro some quando o
+# processo morre). app_idle_timeout: o processo R fica vivo 30 min sem visitas,
+# em vez de 5 s, então o primeiro visitante não espera o carregamento dos dados.
 RUN printf '%s\n' \
       'run_as shiny;' \
+      'preserve_logs true;' \
+      'app_idle_timeout 1800;' \
       'server {' \
       '  listen 3838 0.0.0.0;' \
       '  location /app_ec { app_dir /srv/shiny-server; log_dir /var/log/shiny-server; }' \
