@@ -36,3 +36,6 @@ desktop.ini
 
 # Worktrees temporários do Claude Code (subagentes)
 .claude/worktrees/
+
+# Gerado no build da imagem do app (Dockerfile)
+shiny/www/vendor/

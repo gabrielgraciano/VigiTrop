@@ -38,4 +38,16 @@ RUN rm -rf /srv/shiny-server/* \
  && chown -R shiny:shiny /srv/shiny-server
 COPY --chown=shiny:shiny . /srv/shiny-server/
 
+# O proxy da UNIFESP (Tengine) devolve 403 para endereços com "select", como
+# shinyWidgets/bootstrap-select-1.14.0-beta2/... (provável regra anti-SQL
+# injection). Copiamos os mesmos arquivos do pacote para www/vendor/, com nomes
+# neutros; global.R os registra como dependência "bootstrap-select" de versão
+# maior, que substitui a original.
+RUN set -e; d=$(ls -d /usr/local/lib/R/site-library/shinyWidgets/assets/bootstrap-select-1.14* | tail -n 1) \
+ && mkdir -p /srv/shiny-server/www/vendor \
+ && cp "$d/js/bootstrap-select.min.js" /srv/shiny-server/www/vendor/bs.min.js \
+ && cp "$d/css/bootstrap-select.min.css" /srv/shiny-server/www/vendor/bs.min.css \
+ && sed -i '/sourceMappingURL/d' /srv/shiny-server/www/vendor/bs.min.js /srv/shiny-server/www/vendor/bs.min.css \
+ && chown -R shiny:shiny /srv/shiny-server/www/vendor
+
 EXPOSE 3838

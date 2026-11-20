@@ -97,7 +97,8 @@ ui <- page_navbar(
              tags$span(icon("file-text"), " TCC")
            ))),
   tags$head(
-    tags$link(rel = "shortcut icon", href = "favicon.ico")
+    tags$link(rel = "shortcut icon", href = "favicon.ico"),
+    dep_picker
   ),
   
 )

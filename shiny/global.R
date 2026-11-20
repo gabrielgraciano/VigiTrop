@@ -22,6 +22,15 @@ local({
   options(highcharter.lang = lang)
 })
 
+# bootstrap-select (menus do shinyWidgets) servido de www/vendor/, sem "select"
+# no endereço: o proxy da UNIFESP bloqueia (403) o caminho original. Os arquivos
+# são copiados no build da imagem (Dockerfile). Sem eles (ex.: rodando no RStudio),
+# vale a dependência original do shinyWidgets.
+dep_picker <- if (file.exists(file.path("www", "vendor", "bs.min.js"))) {
+  htmltools::htmlDependency("bootstrap-select", "99.0.0", src = c(href = "vendor"),
+                            script = "bs.min.js", stylesheet = "bs.min.css")
+}
+
 source("dados.R")
 source("inputs.R")
 source("cards.R")

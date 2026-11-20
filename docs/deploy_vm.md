@@ -20,6 +20,8 @@ Na VM (`vml249`), o docker exige `sudo`.
 
 Para rodar o pipeline na VM, a TI teria de trocar o tipo de CPU da VM no Proxmox (por exemplo, "host" ou "x86-64-v2-AES"), o que exige reiniciar a VM.
 
+**O proxy da UNIFESP filtra endereços** (achado em 20/11/2026). Na frente de `vigitrop.unifesp.br` há um Tengine com firewall que devolve 403 para endereços com "select" (provável regra anti-SQL injection). Ele bloqueava o `shinyWidgets/bootstrap-select-...` e, com isso, quebrava os menus e a inicialização do app. O Dockerfile do app agora serve esses arquivos de `www/vendor/`. Se algum recurso novo falhar só pelo domínio, abra o F12 → Network: um 403 com `Server: Tengine` é o firewall, não o app.
+
 ## 0. Diagnóstico (só leitura)
 
 Com a VPN ligada, entre na VM (`ssh gabrielgracianodias@172.22.29.19`) e rode:
