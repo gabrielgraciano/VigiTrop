@@ -1,142 +1,63 @@
-# Inputs
+# Inputs. As opções vêm dos dados (dados.R): doenças, UFs e anos não ficam
+# mais fixos no código. Rótulos curtos: o painel já diz o que se escolhe.
 
+seletor_doenca <- function(id, escolhas = escolhas_doenca) {
+  pickerInput(id, "Doença", choices = escolhas, multiple = FALSE)
+}
+
+seletor_ano <- function(id) {
+  pickerInput(id, "Ano", choices = rev(anos_disponiveis), selected = ano_padrao)
+}
+
+seletor_uf <- function(id, multiplo = FALSE, selecionado = BRASIL) {
+  pickerInput(id, if (multiplo) "UFs (uma ou mais)" else "UF", choices = escolhas_uf_brasil, selected = selecionado,
+              multiple = multiplo, options = pickerOptions(liveSearch = TRUE, noneSelectedText = "Nenhuma",
+                                                           liveSearchPlaceholder = "Buscar UF"))
+}
+
+botao <- function(id) actionButton(id, "Atualizar gráfico", class = "btn-primary w-100")
 
 #Série temporal----
-
-selecionar_doenca_serie_temporal <- pickerInput('doenca_st', "Selecione a doença de interesse",
-                                                choices = c("Dengue", "Doença de Chagas",
-                                                            "Esquistossomose", "Envenenamento por picada de cobra",
-                                                            "Febre chikungunya", "Hanseníase",
-                                                            "Leishmaniose visceral", "Leishmaniose tegumentar americana",
-                                                            "Raiva humana"),
-                                                multiple = FALSE)
-
-selecionar_uf_st<- pickerInput(
-  "uf_st", 
-  "Selecione a UF:", 
-  choices = c(
-    'Brasil',  # Adiciona a opção 'Todos'
-    'Acre', 'Alagoas', 'Amapá', 'Amazonas', 'Bahia', 'Ceará', 'Distrito Federal', 
-    'Espírito Santo', 'Goiás', 'Maranhão', 'Mato Grosso', 'Mato Grosso do Sul', 
-    'Minas Gerais', 'Pará', 'Paraíba', 'Paraná', 'Pernambuco', 'Piauí', 
-    'Rio de Janeiro', 'Rio Grande do Norte', 'Rio Grande do Sul', 'Rondônia', 
-    'Roraima', 'Santa Catarina', 'São Paulo', 'Sergipe', 'Tocantins'
-  ), multiple = TRUE
-)
-
-
-selecionar_sexo <- selecionar_sexo <- pickerInput("sexo", "Selecione o sexo:", choices = c('Masculino', 'Feminino', 'Ambos'), multiple = TRUE)
-
-selecionar_idade <- pickerInput("faixa_etaria", "Selecione a faixa etária:", 
-                                choices = c('Todos',
-                                            '0-4',
-                                            '5-9',
-                                            '10-14',
-                                            '15-19',
-                                            '20-24',
-                                            '25-29',
-                                            '30-34',
-                                            '35-39',
-                                            '40-44',
-                                            '45-49',
-                                            '50-54',
-                                            '55-59',
-                                            '60-64',
-                                            '65-69',
-                                            '70-74',
-                                            '75-79',
-                                            '80-84',
-                                            '85-89',
-                                            '90 ou mais'),
-                                multiple= TRUE)
-
-botao_st <- actionButton("update_st", "Atualizar plot")
-
-
+selecionar_doenca_serie_temporal <- seletor_doenca("doenca_st")
+selecionar_uf_st <- seletor_uf("uf_st", multiplo = TRUE)
+selecionar_sexo <- pickerInput("sexo", "Sexo", choices = SEXOS, selected = "Ambos", multiple = TRUE)
+selecionar_idade <- pickerInput("faixa_etaria", "Faixa etária",
+                                choices = c("Todas" = "Todos", stats::setNames(FAIXAS, FAIXAS)),
+                                selected = "Todos", multiple = TRUE)
+selecionar_periodicidade_st <- radioButtons("periodicidade_st", "Periodicidade", inline = TRUE,
+                                            choices = c("Anual" = "anual", "Mensal" = "mensal"))
+botao_st <- botao("update_st")
 
 #Pirâmide etária----
+selecionar_doenca_piramide_etaria <- seletor_doenca("doenca_pe")
+selecionar_uf_pe <- seletor_uf("uf_pe")
+selecionar_ano_pe <- seletor_ano("ano_pe")
+botao_pe <- botao("update_pe")
 
-selecionar_doenca_piramide_etaria <- pickerInput('doenca_pe', "Selecione a doença de interesse",
-                                                 choices = c("Dengue", "Doença de Chagas",
-                                                             "Esquistossomose", "Envenenamento por picada de cobra",
-                                                             "Febre chikungunya", "Hanseníase",
-                                                             "Leishmaniose visceral", "Leishmaniose tegumentar americana",
-                                                             "Raiva humana"))
+#Sexo e raça/cor----
+selecionar_doenca_estatistica_descritiva <- seletor_doenca("doenca_ed")
+selecionar_uf_ed <- seletor_uf("uf_ed")
+selecionar_dist_ed <- radioButtons("dist_ed", "Distribuir por", choices = c("Sexo" = "sexo", "Raça/cor" = "raca"))
+botao_ed <- botao("update_ed")
 
-selecionar_uf_pe <- pickerInput(
-  "uf_pe", 
-  "Selecione a UF:", 
-  choices = c(
-    'Brasil',  # Adiciona a opção 'Todos'
-    'Acre', 'Alagoas', 'Amapá', 'Amazonas', 'Bahia', 'Ceará', 'Distrito Federal', 
-    'Espírito Santo', 'Goiás', 'Maranhão', 'Mato Grosso', 'Mato Grosso do Sul', 
-    'Minas Gerais', 'Pará', 'Paraíba', 'Paraná', 'Pernambuco', 'Piauí', 
-    'Rio de Janeiro', 'Rio Grande do Norte', 'Rio Grande do Sul', 'Rondônia', 
-    'Roraima', 'Santa Catarina', 'São Paulo', 'Sergipe', 'Tocantins'
-  ), multiple = TRUE
-)
-
-
-selecionar_ano_pe <- pickerInput('ano_pe', 'Selecione o ano',
-                              choices = c(2007:2024))
-
-botao_pe <- actionButton("update_pe", "Atualizar plot")
-
-
-
-
-
-#Estatística descritiva----
-selecionar_doenca_estatistica_descritiva <- pickerInput('doenca_ed', "Selecione a doença de interesse",
-                                                        choices = c("Dengue", "Doença de Chagas",
-                                                                    "Esquistossomose", "Envenenamento por picada de cobra",
-                                                                    "Febre chikungunya", "Hanseníase",
-                                                                    "Leishmaniose visceral", "Leishmaniose tegumentar americana",
-                                                                    "Raiva humana"))
-
-selecionar_uf_ed <- pickerInput(
-  "uf_ed", 
-  "Selecione a UF:", 
-  choices = c(
-    'Acre', 'Alagoas', 'Amapá', 'Amazonas', 'Bahia', 'Ceará', 'Distrito Federal', 
-    'Espírito Santo', 'Goiás', 'Maranhão', 'Mato Grosso', 'Mato Grosso do Sul', 
-    'Minas Gerais', 'Pará', 'Paraíba', 'Paraná', 'Pernambuco', 'Piauí', 
-    'Rio de Janeiro', 'Rio Grande do Norte', 'Rio Grande do Sul', 'Rondônia', 
-    'Roraima', 'Santa Catarina', 'São Paulo', 'Sergipe', 'Tocantins'
-  ), multiple = FALSE
-)
-
-botao_ed <- actionButton("update_ed", "Atualizar plot")
-
-
+#Série semanal----
+selecionar_doenca_sem <- seletor_doenca("doenca_sem", escolhas_doenca_semana)
+selecionar_uf_sem <- seletor_uf("uf_sem", multiplo = TRUE)
+selecionar_periodo_sem <- sliderInput("periodo_sem", "Período (ano da semana)", min = min(anos_disponiveis),
+                                      max = max(anos_disponiveis), value = c(max(anos_disponiveis) - 2, max(anos_disponiveis)),
+                                      step = 1, sep = "")
+botao_sem <- botao("update_sem")
 
 #Mapas----
-selecionar_doenca_map <- pickerInput('doenca_map', "Selecione a doença de interesse",
-                                                choices = c("Dengue", "Doença de Chagas",
-                                                            "Esquistossomose", "Envenenamento por picada de cobra",
-                                                            "Febre chikungunya", "Hanseníase",
-                                                            "Leishmaniose visceral", "Leishmaniose tegumentar americana",
-                                                            "Raiva humana"),
-                                                multiple = FALSE)
+# Um mapa só, com o ranking das UFs ao lado; a escolha vale para os dois.
+selecionar_doenca_map <- seletor_doenca("doenca_map")
+selecionar_ano_map <- seletor_ano("ano_map")
+tipo_mapa <- radioButtons("tipo_mapa", "Mostrar", choices = c("Incidência" = "incidencia", "Casos absolutos" = "casos"))
+botao_map <- botao("update_map")
 
-selecionar_ano_map <- pickerInput('ano_map', 'Selecione o ano',
-                                 choices = c(2007:2024))
-tipo_mapa <-  radioButtons('tipo_mapa', 'Selecione o tipo de mapa', choices = c("Casos Absolutos", "Incidência"))
-botao_map <- actionButton("update_map", "Atualizar plot")
-
-
-#Barchart race----
-selecionar_doenca_br <- pickerInput('doenca_br', "Selecione a doença de interesse",
-                                     choices = c("Dengue", "Doença de Chagas",
-                                                 "Esquistossomose", "Envenenamento por picada de cobra",
-                                                 "Febre chikungunya", "Hanseníase",
-                                                 "Leishmaniose visceral", "Leishmaniose tegumentar americana",
-                                                 "Raiva humana"),
-                                     multiple = FALSE)
-selecionar_doenca_animacao_barras <- pickerInput('doenca_ba', "Selecione a doença de interesse",
-                                                 choices = c("Dengue", "Doença de Chagas",
-                                                             "Esquistossomose", "Envenenamento por picada de cobra",
-                                                             "Febre chikungunya", "Hanseníase",
-                                                             "Leishmaniose visceral", "Leishmaniose tegumentar americana",
-                                                             "Raiva humana"))
-botao_br <- actionButton("update_br", "Atualizar plot")
+#Animação de barras----
+# Id próprio: antes a animação reaproveitava o `tipo_mapa` do painel de mapas
+# (dois inputs com o mesmo id na página).
+selecionar_doenca_br <- seletor_doenca("doenca_br")
+tipo_br <- radioButtons("tipo_br", "Valor", choices = c("Incidência", "Casos" = "Casos Absolutos"))
+botao_br <- botao("update_br")

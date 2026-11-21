@@ -1,6 +1,6 @@
 sobre_dtns_texto <- HTML(
-  '<div style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-  <h2 style="color: #0072B2;">Doenças Tropicais Negligenciadas</h2>
+  '<div style="font-size: 16px; line-height: 1.65; color: #1E2024; max-width: 860px;">
+  <h2 style="color: #1E2024; font-weight: 600; margin-bottom: 16px;">Doenças Tropicais Negligenciadas</h2>
   
   <p>As doenças tropicais negligenciadas (DTNs) são um grupo de doenças ou agravos que
   compartilham determinadas características entre si, como a prevalência em populações desassistidas,

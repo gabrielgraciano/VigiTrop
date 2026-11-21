@@ -1,27 +1,38 @@
+# Conteúdo de cada aba de "Análises". Sem cabeçalho no card: a aba já diz o
+# que é, e o título do gráfico diz o que ele mostra.
 cards <- list(
   card(
     full_screen = TRUE,
-    card_header("Série Temporal"),
-    highchartOutput("monthplot")
+    highchartOutput("monthplot", height = "480px"),
+    card_footer(uiOutput("nota_st"))
   ),
   card(
     full_screen = TRUE,
-    card_header('Pirâmide Etária'),
-    plotlyOutput('piram_et')
+    highchartOutput("piram_et", height = "560px"),
+    card_footer(uiOutput("nota_pe"))
   ),
   card(
     full_screen = TRUE,
-    card_header('Gráfico de Barras'),
-    highchartOutput('barplot_porcentagem')
+    highchartOutput("barras", height = "600px"),
+    card_footer(uiOutput("nota_ed"))
   ),
   card(
     full_screen = TRUE,
-    card_header('Mapas'),
-    leafletOutput('mapa_incid')
+    layout_columns(
+      col_widths = c(7, 5),
+      tags$div(class = "vt-mapa", uiOutput("mapa_titulo"), leafletOutput("mapa_incid", height = "560px")),
+      highchartOutput("ranking_uf", height = "640px")
+    ),
+    card_footer(uiOutput("nota_map"))
   ),
   card(
     full_screen = TRUE,
-    card_header('Animação de Barras'),
-    imageOutput('bar_chart_race')
+    plotlyOutput("bar_chart_race", height = "680px"),
+    card_footer(uiOutput("nota_br"))
+  ),
+  card(
+    full_screen = TRUE,
+    highchartOutput("serie_semanal", height = "480px"),
+    card_footer(uiOutput("nota_sem"))
   )
 )

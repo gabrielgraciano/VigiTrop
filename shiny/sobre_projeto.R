@@ -1,6 +1,6 @@
 sobre_projeto_texto <- HTML('
-  <div style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333;">
-    <h2 style="color: #0072B2;">Sobre o Projeto</h2>
+  <div style="font-size: 16px; line-height: 1.65; color: #1E2024; max-width: 860px;">
+    <h2 style="color: #1E2024; font-weight: 600; margin-bottom: 16px;">Sobre o Projeto</h2>
     <p>
       O presente projeto, intitulado <strong>VigiTrop</strong>, dedica-se ao monitoramento de 
       determinadas doenças tropicais negligenciadas no Brasil. A aplicação fornece análises 
@@ -25,7 +25,7 @@ sobre_projeto_texto <- HTML('
     </p>
     <p style="margin-top: 20px;">
       <strong>Contato:</strong>
-      <a href="mailto:gabriel.graciano@unifesp.br" style="text-decoration: none; color: #0072B2;">
+      <a href="mailto:gabriel.graciano@unifesp.br" style="text-decoration: none; color: #2563EB;">
         <span style="font-size: 18px;">📧</span> gabriel.graciano@unifesp.br
       </a>
     </p>
