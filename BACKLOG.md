@@ -22,11 +22,12 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 - **Dengue e chikungunya (08/11/2026):** o padrão é casos prováveis (notificações menos as descartadas, inconclusivos incluídos), como o Ministério e o TCC. Os confirmados continuam no gold.
 - **Chikungunya 2014-2016 (08/11/2026, correção):** até meados de 2016 a ficha usava 1 = confirmado e 2 = descartado. A regra antiga só confirmava 665 casos em 2015 e contava os descartados como prováveis. Corrigido: o provável de 2015 dá 18,69 por 100 mil, e o Ministério publica 18,7. O valor do TCC para 2015 (16,03) não sai de nenhuma combinação de códigos.
 - **Versão de produção (08/11/2026):** comparada com o repo (`export/app_from_container`, copiada da VM em 31/08/2026). Os textos das abas e a lógica são iguais. Diferenças: o link "TCC" no menu, que foi incorporado; a aba "Animação - barras" desligada, que continua ligada no app novo porque a animação agora roda no navegador; e o `serie_temporal.R`, um rascunho de depuração não usado e com `browser()`, que não foi trazido.
+- **Acessos por celular (21/11/2026):** o app não terá contador de acessos nem serviço de estatística externo. A versão para celular se ajusta sozinha pela largura da tela.
 - **Tendência (08/11/2026):** é recalculada pelo pipeline (joinpoint por BIC) e aparece na aba Tendência. A tabela do TCC fica como referência.
 - **Visual dos gráficos (21/11/2026):** estilo neutro do design system "Gabriel — Data Decks" (skill present-with-data), em `shiny/graficos.R`, `shiny/www/vigitrop.css` e `vigitrop.js`. A fonte IBM Plex Sans é servida pelo próprio app (`www/fonts`, licença OFL).
   - Um mapa só, com a escolha entre incidência e casos absolutos, como no app online. Ao lado entra o ranking das UFs, que segue a mesma escolha e usa as cores do mapa. As faixas são os quintis das UFs com casos.
   - Sexo em colunas 100% empilhadas, como no app online. Raça/cor com duas opções: painéis de linhas (um por grupo, todos na mesma escala) ou as colunas empilhadas.
-  - A corrida de barras animada virou a aba "UFs por ano" (21/11/2026, em teste): mapa de calor UF × ano, com todas as UFs e anos na mesma escala. A animação mostrava um ano por vez, com a escala mudando a cada ano. Se não agradar, a aba sai.
+  - A corrida de barras animada virou a aba "UFs por ano" (21/11/2026): mapa de calor UF × ano, com todas as UFs e anos na mesma escala. A animação mostrava um ano por vez, com a escala mudando a cada ano.
   - **Celular (21/11/2026):** filtros antes do gráfico (antes ficavam no fim da página); abas numa linha com rolagem lateral; nos gráficos estreitos, legenda no alto no lugar dos nomes no fim das linhas, barras de sexo e raça/cor deitadas, siglas no ranking e menos marcas nos eixos (regras `responsive` do Highcharts, em `compacto()` de `graficos.R`); ao clicar em "Atualizar gráfico", a página rola até o gráfico.
   - As taxas não são mais arredondadas em `dados.R`. Antes, 1 caso de raiva em MG virava 0,00 e sumia do mapa.
 
@@ -34,7 +35,6 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 
 - **Deploy na VM (20/11/2026).** O app está montado na VM e em teste na porta 2103. O pipeline não roda lá, porque a CPU virtual não tem x86-64-v2 (NumPy ≥ 2.4); ele roda no GitHub Actions e publica o gold como release. Falta: a troca para a porta 2102; o cron diário do `scripts/atualizar_da_release.sh`; e juntar a branch na `main`, para o agendamento mensal do Actions valer. Opcional: pedir à TI para trocar o tipo de CPU da VM.
 - **Deploy na VM: caminho da URL.** O app antigo ficava em `/srv/shiny-server/app_ec`. O novo responde em `/` e em `/app_ec/`. Confirmar para onde o proxy de `vigitrop.unifesp.br` aponta.
-- **Saber quem acessa pelo celular.** Hoje o app não registra acessos. Opções: um contador próprio, anônimo (data e tipo de aparelho num arquivo na VM, sem IP), ou um serviço de estatística externo (Google Analytics, Plausible), que exige aviso de cookies (LGPD). Falta decidir.
 - **Definição alternativa no app.** O gold já tem todas as contagens (confirmados, prováveis, regra do TCC). O app mostra só a padrão de cada doença; dá para oferecer a troca na interface.
 - **Validação contra o dump.** Comparar com as tabelas `notifications_*` do MySQL antigo.
 - **Dicionários no repo.**
