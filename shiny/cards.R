@@ -27,7 +27,7 @@ cards <- list(
   ),
   card(
     full_screen = TRUE,
-    plotlyOutput("bar_chart_race", height = "680px"),
+    highchartOutput("calor_uf", height = "700px"),
     card_footer(uiOutput("nota_br"))
   ),
   card(

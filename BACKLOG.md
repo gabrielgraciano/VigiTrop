@@ -26,13 +26,15 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 - **Visual dos gráficos (21/11/2026):** estilo neutro do design system "Gabriel — Data Decks" (skill present-with-data), em `shiny/graficos.R`, `shiny/www/vigitrop.css` e `vigitrop.js`. A fonte IBM Plex Sans é servida pelo próprio app (`www/fonts`, licença OFL).
   - Um mapa só, com a escolha entre incidência e casos absolutos, como no app online. Ao lado entra o ranking das UFs, que segue a mesma escolha e usa as cores do mapa. As faixas são os quintis das UFs com casos.
   - Sexo em colunas 100% empilhadas, como no app online. Raça/cor com duas opções: painéis de linhas (um por grupo, todos na mesma escala) ou as colunas empilhadas.
-  - A animação continua, com as cores das regiões testadas para daltonismo.
+  - A corrida de barras animada virou a aba "UFs por ano" (21/11/2026, em teste): mapa de calor UF × ano, com todas as UFs e anos na mesma escala. A animação mostrava um ano por vez, com a escala mudando a cada ano. Se não agradar, a aba sai.
+  - **Celular (21/11/2026):** filtros antes do gráfico (antes ficavam no fim da página); abas numa linha com rolagem lateral; nos gráficos estreitos, legenda no alto no lugar dos nomes no fim das linhas, barras de sexo e raça/cor deitadas, siglas no ranking e menos marcas nos eixos (regras `responsive` do Highcharts, em `compacto()` de `graficos.R`); ao clicar em "Atualizar gráfico", a página rola até o gráfico.
   - As taxas não são mais arredondadas em `dados.R`. Antes, 1 caso de raiva em MG virava 0,00 e sumia do mapa.
 
 ## Outras pendências
 
 - **Deploy na VM (20/11/2026).** O app está montado na VM e em teste na porta 2103. O pipeline não roda lá, porque a CPU virtual não tem x86-64-v2 (NumPy ≥ 2.4); ele roda no GitHub Actions e publica o gold como release. Falta: a troca para a porta 2102; o cron diário do `scripts/atualizar_da_release.sh`; e juntar a branch na `main`, para o agendamento mensal do Actions valer. Opcional: pedir à TI para trocar o tipo de CPU da VM.
 - **Deploy na VM: caminho da URL.** O app antigo ficava em `/srv/shiny-server/app_ec`. O novo responde em `/` e em `/app_ec/`. Confirmar para onde o proxy de `vigitrop.unifesp.br` aponta.
+- **Saber quem acessa pelo celular.** Hoje o app não registra acessos. Opções: um contador próprio, anônimo (data e tipo de aparelho num arquivo na VM, sem IP), ou um serviço de estatística externo (Google Analytics, Plausible), que exige aviso de cookies (LGPD). Falta decidir.
 - **Definição alternativa no app.** O gold já tem todas as contagens (confirmados, prováveis, regra do TCC). O app mostra só a padrão de cada doença; dá para oferecer a troca na interface.
 - **Validação contra o dump.** Comparar com as tabelas `notifications_*` do MySQL antigo.
 - **Dicionários no repo.**

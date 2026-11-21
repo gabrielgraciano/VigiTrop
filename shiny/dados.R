@@ -189,8 +189,8 @@ dados_piramide <- function(doenca, uf, ano) {
   out
 }
 
-#' Valor por UF e ano, com a posição no ranking do ano (para a animação).
-dados_corrida <- function(doenca, tipo) {
+#' Valor (incidência ou casos) por UF e ano, para a aba "UFs por ano".
+dados_uf_ano <- function(doenca, tipo) {
   anos <- anos_da_doenca(doenca)
   sel <- casos[casos$doenca == doenca & !is.na(casos$uf), ]
   grade <- expand.grid(ano = anos, uf = ufs$CD_UF)
@@ -202,8 +202,6 @@ dados_corrida <- function(doenca, tipo) {
   grade$valor <- if (tipo == "Incidência") grade$casos / grade$populacao * 1e5 else grade$casos
   grade$sigla <- ufs$SIGLA_UF[match(grade$uf, ufs$CD_UF)]
   grade$regiao <- c("1" = "Norte", "2" = "Nordeste", "3" = "Sudeste", "4" = "Sul", "5" = "Centro-Oeste")[as.character(grade$uf %/% 10)]
-  grade <- grade[order(grade$ano, -grade$valor, grade$sigla), ]
-  grade$posicao <- ave(grade$valor, grade$ano, FUN = seq_along)
   grade
 }
 

@@ -4,7 +4,6 @@ suppressPackageStartupMessages({
   library(shiny)
   library(bslib)
   library(shinyWidgets)
-  library(plotly)
   library(leaflet)
   library(highcharter)
 })
@@ -38,10 +37,6 @@ COR_SEXO <- c(M = "#2563EB", F = "#B45309")
 # vizinhas se separarem também no daltonismo; "Ignorada" em cinza, no topo.
 COR_RACA <- c("1" = "#93C5FD", "2" = "#2563EB", "3" = "#F59E0B", "4" = "#B45309", "5" = "#0E7C7B", "9" = CORES$contexto)
 COR_RACA_TEXTO <- replace(COR_RACA, c("1", "3", "9"), c(CORES$tinta, CORES$tinta, CORES$tinta_suave))
-# Regiões: Norte e Nordeste em laranjas, Sudeste e Sul em azuis, Centro-Oeste em
-# cinza, com luminosidades diferentes. Testado nos três tipos de daltonismo
-# (menor ΔE entre duas regiões: 23); cada barra também leva a sigla da UF.
-COR_REGIAO <- c("Norte" = "#F59E0B", "Nordeste" = "#B45309", "Sudeste" = "#2563EB", "Sul" = "#93C5FD", "Centro-Oeste" = "#A3A3A3")
 # Rampa sequencial do mapa e do ranking (Blues, sem os dois tons mais claros,
 # que somem no branco); "sem casos" fica num cinza à parte.
 RAMPA_MAPA <- c("#C6DBEF", "#9ECAE1", "#6BAED6", "#3182BD", "#08519C")
