@@ -144,18 +144,19 @@ server <- function(input, output, session) {
     ))
   })
 
-  #Animação de barras----
-  # Animação no navegador (plotly), no lugar do GIF de 600 quadros que o app
-  # antigo renderizava no servidor a cada clique.
-  corrida <- eventReactive(input$update_br, {
+  #UFs por ano----
+  # Mapa de calor UF × ano, no lugar da corrida de barras animada (e, antes
+  # dela, do GIF de 600 quadros que o app antigo renderizava a cada clique).
+  uf_ano <- eventReactive(input$update_br, {
     doenca <- validar(input$doenca_br, escolhas_doenca)
     tipo <- validar(input$tipo_br, c("Casos Absolutos", "Incidência"))
-    list(doenca = doenca, tipo = tipo, dados = dados_corrida(doenca, tipo))
+    list(doenca = doenca, tipo = tipo, dados = dados_uf_ano(doenca, tipo))
   }, ignoreNULL = FALSE)
 
-  output$bar_chart_race <- renderPlotly({
-    r <- corrida()
-    grafico_corrida(r$dados, r$doenca, r$tipo)
+  output$calor_uf <- renderHighchart({
+    r <- uf_ano()
+    grafico_calor(r$dados, r$doenca, r$tipo)
   })
-  output$nota_br <- renderUI(nota_doenca(corrida()$doenca, legenda_regioes()))
+  output$nota_br <- renderUI(nota_doenca(uf_ano()$doenca,
+    "Passe o mouse (ou toque) numa célula para ver o valor. Casos com UF de residência ignorada ficam de fora."))
 }

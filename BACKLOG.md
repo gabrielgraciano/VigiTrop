@@ -22,11 +22,13 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 - **Dengue e chikungunya (08/11/2026):** o padrão é casos prováveis (notificações menos as descartadas, inconclusivos incluídos), como o Ministério e o TCC. Os confirmados continuam no gold.
 - **Chikungunya 2014-2016 (08/11/2026, correção):** até meados de 2016 a ficha usava 1 = confirmado e 2 = descartado. A regra antiga só confirmava 665 casos em 2015 e contava os descartados como prováveis. Corrigido: o provável de 2015 dá 18,69 por 100 mil, e o Ministério publica 18,7. O valor do TCC para 2015 (16,03) não sai de nenhuma combinação de códigos.
 - **Versão de produção (08/11/2026):** comparada com o repo (`export/app_from_container`, copiada da VM em 31/08/2026). Os textos das abas e a lógica são iguais. Diferenças: o link "TCC" no menu, que foi incorporado; a aba "Animação - barras" desligada, que continua ligada no app novo porque a animação agora roda no navegador; e o `serie_temporal.R`, um rascunho de depuração não usado e com `browser()`, que não foi trazido.
+- **Acessos por celular (21/11/2026):** o app não terá contador de acessos nem serviço de estatística externo. A versão para celular se ajusta sozinha pela largura da tela.
 - **Tendência (08/11/2026):** é recalculada pelo pipeline (joinpoint por BIC) e aparece na aba Tendência. A tabela do TCC fica como referência.
 - **Visual dos gráficos (21/11/2026):** estilo neutro do design system "Gabriel — Data Decks" (skill present-with-data), em `shiny/graficos.R`, `shiny/www/vigitrop.css` e `vigitrop.js`. A fonte IBM Plex Sans é servida pelo próprio app (`www/fonts`, licença OFL).
   - Um mapa só, com a escolha entre incidência e casos absolutos, como no app online. Ao lado entra o ranking das UFs, que segue a mesma escolha e usa as cores do mapa. As faixas são os quintis das UFs com casos.
   - Sexo em colunas 100% empilhadas, como no app online. Raça/cor com duas opções: painéis de linhas (um por grupo, todos na mesma escala) ou as colunas empilhadas.
-  - A animação continua, com as cores das regiões testadas para daltonismo.
+  - A corrida de barras animada virou a aba "UFs por ano" (21/11/2026): mapa de calor UF × ano, com todas as UFs e anos na mesma escala. A animação mostrava um ano por vez, com a escala mudando a cada ano.
+  - **Celular (21/11/2026):** filtros antes do gráfico (antes ficavam no fim da página); abas numa linha com rolagem lateral; nos gráficos estreitos, legenda no alto no lugar dos nomes no fim das linhas, barras de sexo e raça/cor deitadas, siglas no ranking e menos marcas nos eixos (regras `responsive` do Highcharts, em `compacto()` de `graficos.R`); ao clicar em "Atualizar gráfico", a página rola até o gráfico.
   - As taxas não são mais arredondadas em `dados.R`. Antes, 1 caso de raiva em MG virava 0,00 e sumia do mapa.
 
 ## Outras pendências

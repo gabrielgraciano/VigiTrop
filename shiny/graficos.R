@@ -93,8 +93,12 @@ marcar_pico <- function(pontos, rotulo, valor) {
   k <- which.max(vapply(pontos, function(p) p$y, numeric(1)))
   if (!length(k) || pontos[[k]]$y <= 0) return(pontos)
   pontos[[k]]$marker <- list(enabled = TRUE, radius = 5, fillColor = CORES$tinta, lineWidth = 0)
+  # Perto das pontas, o rótulo vai para dentro (no celular ele saía do gráfico)
+  pos <- k / length(pontos)
   pontos[[k]]$dataLabels <- list(
     enabled = TRUE, crop = FALSE, overflow = "allow", y = -6,
+    align = if (pos > 0.75) "right" else if (pos < 0.25) "left" else "center",
+    x = if (pos > 0.75) 6 else if (pos < 0.25) -6 else 0,
     format = sprintf('<span style="font-weight:600">%s</span><br/><span style="color:%s">%s</span>',
                      rotulo, CORES$tinta_suave, valor)
   )
@@ -102,6 +106,28 @@ marcar_pico <- function(pontos, rotulo, valor) {
 }
 
 linha_base <- function(valor = 0) list(list(value = valor, color = CORES$tinta, width = 1, zIndex = 3))
+
+#' Versão para celular (regra "responsive" do Highcharts, aplicada pelo próprio
+#' navegador quando o gráfico fica estreito, e desfeita ao girar a tela):
+#' legenda no alto no lugar dos nomes no fim das linhas (VT.rotulosFinais não os
+#' desenha com a legenda ligada), sem título no eixo y e títulos menores.
+#' `extra` acrescenta ou troca opções nessa versão.
+compacto <- function(hc, extra = list(), largura = 520) {
+  base <- list(
+    chart = list(marginRight = 8),
+    title = list(style = list(fontSize = "16px")),
+    subtitle = list(style = list(fontSize = "13px")),
+    legend = list(enabled = TRUE, align = "left", verticalAlign = "top", x = 0, margin = 8),
+    xAxis = list(labels = list(rotation = 0)),
+    yAxis = list(title = list(text = ""))
+  )
+  hc_responsive(hc, rules = list(list(condition = list(maxWidth = largura),
+                                      chartOptions = utils::modifyList(base, extra))))
+}
+
+#' Faixa dos preliminares sem o texto "Preliminar" (no celular ele cai em cima
+#' do rótulo do pico).
+sem_rotulo <- function(bandas) lapply(bandas, function(b) { b$label <- NULL; b })
 
 # ---- série temporal ----------------------------------------------------------
 
@@ -126,11 +152,11 @@ grafico_serie <- function(dados, doenca, mensal, detalhe = NULL) {
   periodo <- if (mensal) paste0(mes_ano(min(dados$mes)), "–", mes_ano(max(dados$mes))) else periodo_anos(dados$ano)
   sub <- paste0(if (mensal) "Casos notificados no mês por 100 mil habitantes" else "Casos por 100 mil habitantes, por ano de notificação",
                 if (length(detalhe)) paste0(". ", detalhe) else "")
+  bandas <- if (mensal) faixa_preliminar(doenca, datas = TRUE) else faixa_preliminar(doenca)
   eixo_x <- if (mensal) {
-    list(type = "datetime", plotBands = faixa_preliminar(doenca, datas = TRUE),
-         dateTimeLabelFormats = list(month = "%b/%Y", year = "%Y"))
+    list(type = "datetime", plotBands = bandas, dateTimeLabelFormats = list(month = "%b/%Y", year = "%Y"))
   } else {
-    list(allowDecimals = FALSE, plotBands = faixa_preliminar(doenca))
+    list(allowDecimals = FALSE, plotBands = bandas)
   }
   hc |>
     hc_title(text = paste0("Incidência ", if (mensal) "mensal " else "", "de ", nome_doenca(doenca), ", ", periodo)) |>
@@ -141,6 +167,7 @@ grafico_serie <- function(dados, doenca, mensal, detalhe = NULL) {
     hc_tooltip(shared = TRUE, crosshairs = TRUE, xDateFormat = "%b/%Y", headerFormat = "<b>{point.key}</b><br/>",
                pointFormat = paste0('<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.',
                                     casas, 'f}</b> ({point.casos} casos)<br/>')) |>
+    compacto(list(xAxis = c(list(plotBands = sem_rotulo(bandas)), if (!mensal) list(tickInterval = 5)))) |>
     exportacao(doenca, "serie")
 }
 
@@ -162,16 +189,18 @@ grafico_semanal <- function(dados, doenca) {
                               lineWidth = if (um) 2.5 else 2)
   }
   anos <- as.integer(format(range(dados$inicio_semana), "%Y"))
+  bandas <- faixa_preliminar(doenca, datas = TRUE)
   hc |>
     hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por semana epidemiológica, ", periodo_anos(anos))) |>
     hc_subtitle(text = "Casos por semana de início dos sintomas. As semanas mais recentes ainda estão incompletas.") |>
-    hc_xAxis(type = "datetime", plotBands = faixa_preliminar(doenca, datas = TRUE),
+    hc_xAxis(type = "datetime", plotBands = bandas,
              dateTimeLabelFormats = list(week = "%d/%m/%Y", month = "%b/%Y", year = "%Y")) |>
     hc_yAxis(min = 0, title = list(text = "casos por semana"), plotLines = linha_base()) |>
     hc_legend(enabled = FALSE) |>
     hc_tooltip(shared = TRUE, crosshairs = TRUE, xDateFormat = "Semana de %d/%m/%Y",
                headerFormat = "<b>{point.key}</b><br/>",
                pointFormat = '<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.0f}</b> casos<br/>') |>
+    compacto(list(xAxis = list(plotBands = sem_rotulo(bandas)))) |>
     exportacao(doenca, "semanal")
 }
 
@@ -217,6 +246,9 @@ grafico_barras <- function(d, doenca, uf, por = c("sexo", "raca")) {
              plotLines = if (sexo) list(list(value = 50, color = CORES$tinta, width = 1, dashStyle = "Dash", zIndex = 5))) |>
     hc_legend(enabled = FALSE) |>
     hc_tooltip(headerFormat = "<b>{point.key}</b><br/>", pointFormat = "{series.name}: {point.casos} casos ({point.y:.1f}%)") |>
+    # No celular, 20 colunas não cabem: as barras deitam (um ano por linha)
+    compacto(list(chart = list(inverted = TRUE, marginRight = 24), legend = list(reversed = sexo),
+                  yAxis = list(labels = list(rotation = 0), tickInterval = 50))) |>
     exportacao(doenca, if (sexo) "sexo" else "raca_cor")
 }
 
@@ -284,6 +316,10 @@ grafico_piramide <- function(d, doenca, uf, ano) {
   marcas <- pretty(c(0, m), n = 3)
   marcas <- marcas[marcas <= m * 1.08]
   marcas <- c(-rev(marcas[-1]), marcas)
+  # No celular, só três marcas no eixo (sem elas, os rótulos ficam inclinados)
+  poucas <- pretty(c(0, m), n = 2)
+  poucas <- poucas[poucas <= m * 1.08]
+  poucas <- c(-rev(poucas[-1]), poucas)
   highchart() |>
     hc_chart(type = "bar", events = list(render = JS("VT.rotulosLados"))) |>
     hc_add_series(data = serie("M", -1), name = "Masculino", color = COR_SEXO[["M"]]) |>
@@ -298,6 +334,7 @@ grafico_piramide <- function(d, doenca, uf, ano) {
                               formatar_numero(pct_f, 0), "% no sexo feminino.")) |>
     hc_legend(enabled = FALSE) |>
     hc_tooltip(headerFormat = "", pointFormat = "<b>{series.name}, {point.category} anos</b><br/>{point.casos} casos ({point.pct}% do total)") |>
+    compacto(list(legend = list(enabled = FALSE), yAxis = list(tickPositions = poucas))) |>
     exportacao(doenca, "piramide")
 }
 
@@ -311,7 +348,10 @@ classes_mapa <- function(valor, casas, casos = valor) {
   if (!length(pos)) return(list(cor = cor, cores = COR_SEM_CASOS, rotulos = "Sem casos"))
   # Até 5 faixas, mas nunca mais faixas que UFs com casos (raiva: 1 ou 2 UFs)
   k <- min(5, length(unique(pos)))
-  cortes <- unique(signif(stats::quantile(pos, seq(0, 1, length.out = k + 1), names = FALSE), 2))
+  q <- signif(stats::quantile(pos, seq(0, 1, length.out = k + 1), names = FALSE), 2)
+  # Contagens: faixas de inteiros. Começa em (mínimo − 1), para que um valor
+  # muito repetido (raiva: 1 caso) tenha faixa própria.
+  cortes <- if (casas == 0) unique(c(min(pos) - 1, round(q[-1]))) else unique(q)
   cortes[1] <- min(cortes[1], min(pos))
   cortes[length(cortes)] <- max(cortes[length(cortes)], max(pos))
   if (length(cortes) < 2) cortes <- c(0, max(pos))
@@ -321,7 +361,13 @@ classes_mapa <- function(valor, casas, casos = valor) {
   classe[classe < 1] <- 1
   ok <- is.finite(valor) & casos > 0
   cor[ok] <- rampa[classe[ok]]
-  rotulos <- paste0(formatar_numero(cortes[-(k + 1)], casas), " – ", formatar_numero(cortes[-1], casas))
+  de <- cortes[-(k + 1)]
+  ate <- cortes[-1]
+  # As faixas são abertas à esquerda: nas contagens, cada uma começa no inteiro
+  # seguinte ao corte (ex.: 5.001 – 8.800)
+  if (casas == 0) de <- floor(de) + 1
+  rotulos <- ifelse(round(de, casas) == round(ate, casas), formatar_numero(ate, casas),
+                    paste0(formatar_numero(de, casas), " – ", formatar_numero(ate, casas)))
   if (any(!ok)) list(cor = cor, cores = c(rev(rampa), COR_SEM_CASOS), rotulos = c(rev(rotulos), "Sem casos"))
   else list(cor = cor, cores = rev(rampa), rotulos = rev(rotulos))
 }
@@ -417,54 +463,80 @@ grafico_ranking <- function(m, doenca, ano, por = c("incidencia", "casos")) {
     hc_legend(enabled = FALSE) |>
     hc_tooltip(headerFormat = "<b>{point.key}</b><br/>",
                pointFormat = "{point.casos} casos<br/>{point.incid} por 100 mil hab.") |>
+    # No celular, sigla no lugar do nome (os nomes longos eram cortados). O
+    # limite é menor que o dos outros gráficos: no computador o ranking já é
+    # estreito (fica ao lado do mapa).
+    compacto(list(legend = list(enabled = FALSE), xAxis = list(categories = m$SIGLA_UF)), largura = 380) |>
     exportacao(doenca, "ranking_ufs")
 }
 
-# ---- animação (ranking das UFs ano a ano) ------------------------------------
+# ---- UFs por ano (mapa de calor) --------------------------------------------
 
-grafico_corrida <- function(d, doenca, tipo) {
+#' Mapa de calor UF × ano: todas as UFs e todos os anos de uma vez, na mesma
+#' escala (faixas pelos quintis de todas as células com casos, como no mapa).
+#' Uma linha por UF, na ordem do IBGE, agrupadas por região (nome à direita).
+#' Substitui a corrida de barras animada, que mostrava um ano por vez e mudava
+#' a escala a cada ano, sem dar para comparar os anos.
+grafico_calor <- function(d, doenca, tipo) {
   incid <- tipo == "Incidência"
   casas <- if (incid) casas_taxa(d$valor) else 0
-  d$texto <- paste0(d$sigla, "  ", formatar_numero(d$valor, casas))
-  p <- plot_ly(d, x = ~valor, y = ~posicao, frame = ~ano, ids = ~sigla, type = "bar", orientation = "h",
-               marker = list(color = unname(COR_REGIAO[d$regiao])), text = ~texto, textposition = "outside",
-               textfont = list(color = CORES$tinta, size = 12, family = FONTE),
-               hovertemplate = "%{text}<extra></extra>", cliponaxis = FALSE) |>
-    layout(
-      font = list(family = FONTE, color = CORES$tinta, size = 13),
-      title = list(text = paste0("<b>", if (incid) "Incidência" else "Casos", " de ", nome_doenca(doenca),
-                                 ": ranking das UFs ano a ano</b><br><span style='font-size:14px;color:", CORES$tinta_suave,
-                                 "'>", if (incid) "Casos por 100 mil habitantes" else "Casos notificados",
-                                 ". A escala muda a cada ano; a cor é a região.</span>"),
-                   x = 0, xanchor = "left", xref = "paper", font = list(size = 18)),
-      yaxis = list(autorange = "reversed", showticklabels = FALSE, title = "", dtick = 1, showgrid = FALSE, zeroline = FALSE),
-      xaxis = list(title = "", gridcolor = CORES$grade, zeroline = TRUE, zerolinecolor = CORES$tinta,
-                   tickfont = list(color = CORES$tinta_suave), separatethousands = TRUE),
-      separators = ",.",
-      margin = list(t = 80, r = 60, l = 10),
-      hoverlabel = list(bgcolor = "#FFFFFF", bordercolor = CORES$grade, font = list(family = FONTE, color = CORES$tinta)),
-      showlegend = FALSE, plot_bgcolor = "#FFFFFF", paper_bgcolor = "#FFFFFF"
-    ) |>
-    animation_opts(frame = 900, transition = 500, redraw = FALSE) |>
-    animation_button(label = "Reproduzir", font = list(color = CORES$tinta), bgcolor = "#FFFFFF", bordercolor = "#CBD5E1") |>
-    animation_slider(currentvalue = list(prefix = "", xanchor = "right", font = list(size = 28, color = CORES$tinta)),
-                     font = list(color = CORES$tinta_suave), bordercolor = "#CBD5E1", tickcolor = CORES$tinta_suave)
-  # Eixo x de cada ano no máximo daquele ano: com um eixo só (máximo de todos
-  # os anos), um ano de epidemia achata as barras dos outros.
-  p <- plotly_build(p)
-  maximos <- tapply(d$valor, d$ano, max)
-  primeiro <- names(maximos)[1]
-  for (i in seq_along(p$x$frames)) {
-    mx <- maximos[[p$x$frames[[i]]$name]]
-    p$x$frames[[i]]$layout <- list(xaxis = list(range = c(0, max(mx, 1e-9) * 1.18)))
+  anos <- sort(unique(d$ano))
+  prelim <- setdiff(anos, anos_finais(doenca))
+  uf_ord <- unique(d[order(d$uf), c("uf", "sigla", "regiao")])
+  cl <- classes_mapa(d$valor, casas, d$casos)
+  rotulo <- if (incid) {
+    paste0(formatar_numero(d$valor, casas), " por 100 mil hab. (", formatar_numero(d$casos), " casos)")
+  } else {
+    paste(formatar_numero(d$casos), "casos")
   }
-  p$x$layout$xaxis$range <- c(0, max(maximos[[primeiro]], 1e-9) * 1.18)
-  p
-}
+  pontos <- list_parse(data.frame(
+    x = match(d$ano, anos) - 1, y = match(d$uf, uf_ord$uf) - 1, value = d$valor, color = cl$cor,
+    nome = ufs$NM_UF[match(d$uf, ufs$CD_UF)], ano = d$ano, rotulo = rotulo
+  ))
+  # Separação entre as regiões e o nome de cada uma no meio do seu grupo
+  fim_regiao <- cumsum(rle(uf_ord$regiao)$lengths)
+  meio <- floor((c(0, utils::head(fim_regiao, -1)) + fim_regiao - 1) / 2)
+  nomes_regiao <- rep("", nrow(uf_ord))
+  nomes_regiao[meio + 1] <- rle(uf_ord$regiao)$values
+  separadores <- lapply(utils::head(fim_regiao, -1) - 0.5, function(v) list(value = v, color = "#FFFFFF", width = 4, zIndex = 5))
 
-legenda_regioes <- function() {
-  tags$div(class = "vt-legenda", "Cor por região:",
-           lapply(names(COR_REGIAO), function(n) tags$span(style = paste0("--cor:", COR_REGIAO[[n]]), n)))
+  hc <- highchart(height = 700) |>
+    hc_chart(type = "heatmap", spacingRight = 8) |>
+    hc_add_series(data = pontos, name = if (incid) "Incidência" else "Casos", borderWidth = 1, borderColor = "#FFFFFF",
+                  showInLegend = FALSE, colsize = 1, rowsize = 1)
+  # Legenda das faixas: séries vazias, só para aparecer na legenda (da menor
+  # para a maior; "sem casos" no fim)
+  ordem <- rev(seq_along(cl$cores))
+  if (cl$rotulos[length(cl$rotulos)] == "Sem casos") ordem <- c(rev(seq_len(length(cl$cores) - 1)), length(cl$cores))
+  for (i in ordem) {
+    hc <- hc |> hc_add_series(data = list(), type = "scatter", name = cl$rotulos[i], color = cl$cores[i],
+                              marker = list(symbol = "square", radius = 6), enableMouseTracking = FALSE)
+  }
+  hc |>
+    hc_title(text = paste0(if (incid) "Incidência" else "Casos", " de ", nome_doenca(doenca), " por UF e ano, ", periodo_anos(anos))) |>
+    hc_subtitle(text = paste0(if (incid) "Casos por 100 mil habitantes" else "Casos notificados",
+                              ", pela UF de residência. Faixas pelos quintis de todas as UFs e anos com casos: a mesma escala em todos os anos.",
+                              if (length(prelim)) " * Dados preliminares." else "")) |>
+    hc_xAxis(categories = ifelse(anos %in% prelim, paste0(anos, "*"), anos), lineWidth = 0, tickLength = 0,
+             labels = list(autoRotation = FALSE)) |>
+    hc_yAxis_multiples(
+      list(categories = uf_ord$sigla, reversed = TRUE, title = list(text = ""), gridLineWidth = 0,
+           labels = list(step = 1, style = list(fontSize = "12px")), plotLines = separadores),
+      list(categories = nomes_regiao, reversed = TRUE, linkedTo = 0, opposite = TRUE, title = list(text = ""),
+           gridLineWidth = 0, lineWidth = 0, tickLength = 0,
+           labels = list(step = 1, style = list(color = CORES$tinta_suave, fontSize = "12px")))
+    ) |>
+    hc_legend(enabled = TRUE, symbolRadius = 0, itemDistance = 14,
+              title = list(text = if (incid) "por 100 mil hab." else "casos", style = list(fontWeight = "600"))) |>
+    hc_tooltip(headerFormat = "", pointFormat = "<b>{point.nome}, {point.ano}</b><br/>{point.rotulo}") |>
+    # Celular: anos de 5 em 5 e sem o nome das regiões (falta largura)
+    hc_responsive(rules = list(list(condition = list(maxWidth = 520), chartOptions = list(
+      title = list(style = list(fontSize = "16px")), subtitle = list(style = list(fontSize = "13px")),
+      xAxis = list(labels = list(step = 5, rotation = 0)),
+      yAxis = list(list(labels = list(style = list(fontSize = "11px"))), list(labels = list(enabled = FALSE))),
+      legend = list(itemDistance = 10, alignColumns = FALSE)
+    )))) |>
+    exportacao(doenca, "ufs_por_ano")
 }
 
 # ---- tendência (joinpoint) -----------------------------------------------
@@ -523,7 +595,7 @@ grafico_tendencia <- function(t, obs, doenca) {
     meio <- ceiling(length(pts) / 2)
     sobe <- s$apc > 0
     pts[[meio]]$dataLabels <- list(
-      enabled = TRUE, crop = FALSE, overflow = "allow", align = "left", x = 8,
+      enabled = TRUE, crop = FALSE, overflow = "allow", align = "left", x = 8, className = "vt-rotulo-segmento",
       verticalAlign = if (sobe) "top" else "bottom", y = if (sobe) 8 else -6,
       format = sprintf('<span style="font-weight:600;color:%s">%s%% ao ano</span> <span style="color:%s">%s</span>',
                        COR_SENTIDO[[sd]], com_sinal(s$apc, 1), CORES$tinta_suave, tolower(NOME_SENTIDO[[sd]]))
@@ -547,6 +619,9 @@ grafico_tendencia <- function(t, obs, doenca) {
     hc_yAxis(min = 0, title = list(text = "por 100 mil hab."), plotLines = linha_base()) |>
     hc_legend(enabled = FALSE) |>
     hc_tooltip(headerFormat = "") |>
+    # No celular, o APC de cada segmento fica só na tabela abaixo (o rótulo
+    # some pelo CSS, classe vt-rotulo-segmento)
+    compacto(list(legend = list(enabled = FALSE), xAxis = list(tickInterval = 5))) |>
     exportacao(doenca, "tendencia")
 }
 

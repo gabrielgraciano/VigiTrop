@@ -15,6 +15,8 @@ VT.limpar = function (chart) {
 VT.rotulosFinais = function () {
   var chart = this, itens = [], min = 18;
   VT.limpar(chart);
+  // No celular (regra "responsive" em graficos.R) a legenda substitui os nomes
+  if (chart.legend && chart.legend.options.enabled) return;
   chart.series.forEach(function (s) {
     if (!s.visible || s.options.vtSemRotulo) return;
     var coluna = s.type === 'column' || s.type === 'bar';
@@ -78,3 +80,11 @@ VT.rotuloAbs = function () {
 VT.num = function (x, casas) {
   return Highcharts.numberFormat(x, casas === undefined ? 0 : casas, ',', '.');
 };
+
+// Celular: os filtros ficam acima do gráfico; ao clicar em "Atualizar gráfico",
+// a página rola até o gráfico.
+$(document).on('click', '.bslib-sidebar-layout > .sidebar .btn-primary', function () {
+  if (window.innerWidth >= 576) return;
+  var main = $(this).closest('.bslib-sidebar-layout').children('.main').get(0);
+  if (main) main.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});

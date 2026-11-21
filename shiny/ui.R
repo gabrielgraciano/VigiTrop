@@ -10,6 +10,8 @@ ui <- page_navbar(
             page_sidebar(
               sidebar = sidebar(
                 width = 280,
+                # No celular, os filtros vêm antes do gráfico (antes ficavam no fim da página)
+                open = list(desktop = "open", mobile = "always-above"),
                 conditionalPanel(
                   condition = "input.navset == 'Mapas'",
                   selecionar_doenca_map,
@@ -49,7 +51,7 @@ ui <- page_navbar(
                   botao_pe
                 ),
                 conditionalPanel(
-                  condition = "input.navset == 'Animação - barras'",
+                  condition = "input.navset == 'UFs por ano'",
                   selecionar_doenca_br,
                   tipo_br,
                   botao_br
@@ -62,7 +64,7 @@ ui <- page_navbar(
                 nav_panel("Série temporal", cards[[1]]),
                 nav_panel("Série semanal", cards[[6]]),
                 nav_panel("Pirâmide Etária", cards[[2]]),
-                nav_panel("Animação - barras", cards[[5]])
+                nav_panel("UFs por ano", cards[[5]])
               )
             )),
   nav_panel(title = "Tendência", div(tendencia)),

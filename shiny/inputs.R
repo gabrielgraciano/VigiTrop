@@ -60,9 +60,8 @@ selecionar_ano_map <- seletor_ano("ano_map")
 tipo_mapa <- radioButtons("tipo_mapa", "Mostrar", choices = c("Incidência" = "incidencia", "Casos absolutos" = "casos"))
 botao_map <- botao("update_map")
 
-#Animação de barras----
-# Id próprio: antes a animação reaproveitava o `tipo_mapa` do painel de mapas
-# (dois inputs com o mesmo id na página).
+#UFs por ano----
+# Ids "_br" herdados da antiga animação (bar chart race).
 selecionar_doenca_br <- seletor_doenca("doenca_br")
 tipo_br <- radioButtons("tipo_br", "Valor", choices = c("Incidência", "Casos" = "Casos Absolutos"))
 botao_br <- botao("update_br")

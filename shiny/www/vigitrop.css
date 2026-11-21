@@ -92,9 +92,14 @@ body { font-variant-numeric: lining-nums; }
 .vt-sentido.cai { color: var(--vt-destaque); }
 .vt-sentido.estavel { color: var(--vt-tinta-suave); }
 
-/* Legenda de regiões da animação: quadrado colorido + nome em tinta. */
-.vt-legenda { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
-.vt-legenda span::before {
-  content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px;
-  background: var(--cor); vertical-align: -1px;
+/* Celular: as abas numa linha só, com rolagem lateral, em vez de três linhas. */
+@media (max-width: 575.98px) {
+  .nav-underline { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  .nav-underline::-webkit-scrollbar { display: none; }
+  .nav-underline .nav-link { white-space: nowrap; }
+  .vt-titulo { font-size: 16px; }
+  .vt-subtitulo { font-size: 13px; }
+  /* Tendência: a tabela rola de lado; o APC sai do gráfico (está na tabela). */
+  .vt-tabela { display: block; overflow-x: auto; min-width: 0; max-width: 100%; }
+  .vt-rotulo-segmento { display: none; }
 }
