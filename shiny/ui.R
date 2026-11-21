@@ -22,6 +22,7 @@ ui <- page_navbar(
                   selecionar_doenca_estatistica_descritiva,
                   selecionar_uf_ed,
                   selecionar_dist_ed,
+                  selecionar_grafico_raca,
                   botao_ed
                 ),
                 conditionalPanel(

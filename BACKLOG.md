@@ -25,7 +25,7 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 - **Tendência (08/11/2026):** é recalculada pelo pipeline (joinpoint por BIC) e aparece na aba Tendência. A tabela do TCC fica como referência.
 - **Visual dos gráficos (21/11/2026):** estilo neutro do design system "Gabriel — Data Decks" (skill present-with-data), em `shiny/graficos.R`, `shiny/www/vigitrop.css` e `vigitrop.js`. A fonte IBM Plex Sans é servida pelo próprio app (`www/fonts`, licença OFL).
   - Um mapa só, com a escolha entre incidência e casos absolutos, como no app online. Ao lado entra o ranking das UFs, que segue a mesma escolha e usa as cores do mapa. As faixas são os quintis das UFs com casos.
-  - Sexo e raça/cor continuam em colunas 100% empilhadas, como no app online, com o nome do grupo ao lado da última coluna.
+  - Sexo em colunas 100% empilhadas, como no app online. Raça/cor com duas opções: painéis de linhas (um por grupo, todos na mesma escala) ou as colunas empilhadas.
   - A animação continua, com as cores das regiões testadas para daltonismo.
   - As taxas não são mais arredondadas em `dados.R`. Antes, 1 caso de raiva em MG virava 0,00 e sumia do mapa.
 

@@ -220,6 +220,55 @@ grafico_barras <- function(d, doenca, uf, por = c("sexo", "raca")) {
     exportacao(doenca, if (sexo) "sexo" else "raca_cor")
 }
 
+#' Raça/cor: um painel por grupo (receita 14), mesma escala em todos. Em cada
+#' painel, o grupo em azul e os outros em cinza; a manchete dá o valor do último
+#' ano fechado e a variação desde o primeiro ano.
+paineis_raca <- function(d, doenca, uf) {
+  anos <- sort(unique(d$ano))
+  finais <- intersect(anos_finais(doenca), anos)
+  ref <- if (length(finais)) max(finais) else max(anos)
+  ordem <- d[d$ano == ref & d$grupo != "9", ]
+  ordem <- c(ordem$grupo[order(-ordem$porcentagem)], "9")
+  teto <- ceiling(max(d$porcentagem, na.rm = TRUE) / 10) * 10
+  bandas <- faixa_preliminar(doenca, anos)
+  if (length(bandas)) bandas[[1]]$label <- NULL
+
+  painel <- function(g) {
+    foco <- d[d$grupo == g, ]
+    inicio <- foco$porcentagem[foco$ano == min(anos)]
+    fim <- foco$porcentagem[foco$ano == ref]
+    delta <- round(fim) - round(inicio)
+    manchete <- if (is.na(fim)) "Sem casos" else paste0(
+      formatar_numero(fim, 0), "% em ", ref, " · ",
+      if (is.na(inicio)) "" else if (delta == 0) paste("igual a", min(anos)) else paste(com_sinal(delta, 0), "p.p. desde", min(anos))
+    )
+    hc <- highchart(height = 235) |>
+      hc_chart(type = "line", spacing = list(8, 8, 8, 0)) |>
+      hc_xAxis(categories = anos, plotBands = bandas, tickInterval = max(1, ceiling(length(anos) / 4)), labels = list(step = 1)) |>
+      hc_yAxis(min = 0, max = teto, tickAmount = 3, labels = list(format = "{value}%"), title = list(text = "")) |>
+      hc_legend(enabled = FALSE) |>
+      hc_tooltip(headerFormat = "<b>{point.key}</b><br/>", pointFormat = "{series.name}: {point.y:.1f}% ({point.casos} casos)")
+    for (o in setdiff(names(RACAS), g)) {
+      hc <- hc |> hc_add_series(data = d$porcentagem[d$grupo == o], name = RACAS[[o]], color = CORES$contexto,
+                                lineWidth = 1.25, opacity = 0.5, enableMouseTracking = FALSE, zIndex = 1)
+    }
+    hc <- hc |> hc_add_series(data = list_parse(data.frame(y = foco$porcentagem, casos = formatar_numero(foco$casos))),
+                              name = RACAS[[g]], color = CORES$destaque, lineWidth = 3, zIndex = 2)
+    tags$div(class = "vt-painel",
+             tags$p(class = "vt-painel-nome", RACAS[[g]]),
+             tags$p(class = "vt-painel-manchete", manchete),
+             hc)
+  }
+  tags$div(
+    class = "vt-bloco",
+    tags$p(class = "vt-titulo", paste0("Casos de ", nome_doenca(doenca), " por raça/cor, ", nome_uf(uf), ", ", periodo_anos(anos))),
+    tags$p(class = "vt-subtitulo",
+           "% dos casos de cada ano. Em cada painel, a linha azul é o grupo do painel e as cinzas, os demais; todos na mesma escala.",
+           if (length(bandas)) " A faixa cinza marca os anos preliminares."),
+    tags$div(class = "vt-grade-paineis", lapply(ordem, painel))
+  )
+}
+
 # ---- pirâmide etária -----------------------------------------------------
 
 grafico_piramide <- function(d, doenca, uf, ano) {

@@ -80,13 +80,16 @@ server <- function(input, output, session) {
     doenca <- validar(input$doenca_ed, escolhas_doenca)
     uf <- validar(input$uf_ed, escolhas_uf_brasil)
     por <- validar(input$dist_ed, c("sexo", "raca"))
-    list(doenca = doenca, uf = uf, por = por, dados = dados_barras(doenca, uf, por))
+    grafico <- validar(input$grafico_raca, c("linhas", "barras"))
+    list(doenca = doenca, uf = uf, por = por, grafico = grafico, dados = dados_barras(doenca, uf, por))
   }, ignoreNULL = FALSE)
 
-  output$barras <- renderHighchart({
+  # Sexo: colunas empilhadas. Raça/cor: painéis de linhas ou colunas empilhadas.
+  output$barras <- renderUI({
     r <- barras()
     validate(need(any(r$dados$casos > 0), "Não há casos para esse conjunto de filtros."))
-    grafico_barras(r$dados, r$doenca, r$uf, r$por)
+    if (r$por == "raca" && r$grafico == "linhas") paineis_raca(r$dados, r$doenca, r$uf)
+    else grafico_barras(r$dados, r$doenca, r$uf, r$por)
   })
   output$nota_ed <- renderUI({
     r <- barras()

@@ -38,6 +38,11 @@ botao_pe <- botao("update_pe")
 selecionar_doenca_estatistica_descritiva <- seletor_doenca("doenca_ed")
 selecionar_uf_ed <- seletor_uf("uf_ed")
 selecionar_dist_ed <- radioButtons("dist_ed", "Distribuir por", choices = c("Sexo" = "sexo", "Raça/cor" = "raca"))
+# Só para raça/cor: painéis de linhas (um por grupo) ou colunas empilhadas
+selecionar_grafico_raca <- conditionalPanel(
+  condition = "input.dist_ed == 'raca'",
+  radioButtons("grafico_raca", "Gráfico", choices = c("Linhas" = "linhas", "Barras" = "barras"))
+)
 botao_ed <- botao("update_ed")
 
 #Série semanal----

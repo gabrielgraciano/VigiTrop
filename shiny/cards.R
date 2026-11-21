@@ -13,7 +13,7 @@ cards <- list(
   ),
   card(
     full_screen = TRUE,
-    highchartOutput("barras", height = "600px"),
+    uiOutput("barras"),
     card_footer(uiOutput("nota_ed"))
   ),
   card(
