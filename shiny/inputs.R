@@ -1,59 +1,64 @@
 # Inputs. As opções vêm dos dados (dados.R): doenças, UFs e anos não ficam
-# mais fixos no código.
+# mais fixos no código. Rótulos curtos: o painel já diz o que se escolhe.
 
-seletor_doenca <- function(id) {
-  pickerInput(id, "Selecione a doença de interesse", choices = escolhas_doenca, multiple = FALSE)
+seletor_doenca <- function(id, escolhas = escolhas_doenca) {
+  pickerInput(id, "Doença", choices = escolhas, multiple = FALSE)
 }
 
 seletor_ano <- function(id) {
-  pickerInput(id, "Selecione o ano", choices = rev(anos_disponiveis), selected = ano_padrao)
+  pickerInput(id, "Ano", choices = rev(anos_disponiveis), selected = ano_padrao)
 }
 
 seletor_uf <- function(id, multiplo = FALSE, selecionado = BRASIL) {
-  pickerInput(id, "Selecione a UF:", choices = escolhas_uf_brasil, selected = selecionado, multiple = multiplo,
-              options = pickerOptions(liveSearch = TRUE))
+  pickerInput(id, if (multiplo) "UFs (uma ou mais)" else "UF", choices = escolhas_uf_brasil, selected = selecionado,
+              multiple = multiplo, options = pickerOptions(liveSearch = TRUE, noneSelectedText = "Nenhuma",
+                                                           liveSearchPlaceholder = "Buscar UF"))
 }
+
+botao <- function(id) actionButton(id, "Atualizar gráfico", class = "btn-primary w-100")
 
 #Série temporal----
 selecionar_doenca_serie_temporal <- seletor_doenca("doenca_st")
 selecionar_uf_st <- seletor_uf("uf_st", multiplo = TRUE)
-selecionar_sexo <- pickerInput("sexo", "Selecione o sexo:", choices = SEXOS, selected = "Ambos", multiple = TRUE)
-selecionar_idade <- pickerInput("faixa_etaria", "Selecione a faixa etária:",
+selecionar_sexo <- pickerInput("sexo", "Sexo", choices = SEXOS, selected = "Ambos", multiple = TRUE)
+selecionar_idade <- pickerInput("faixa_etaria", "Faixa etária",
                                 choices = c("Todas" = "Todos", stats::setNames(FAIXAS, FAIXAS)),
                                 selected = "Todos", multiple = TRUE)
 selecionar_periodicidade_st <- radioButtons("periodicidade_st", "Periodicidade", inline = TRUE,
                                             choices = c("Anual" = "anual", "Mensal" = "mensal"))
-botao_st <- actionButton("update_st", "Atualizar plot")
+botao_st <- botao("update_st")
 
 #Pirâmide etária----
 selecionar_doenca_piramide_etaria <- seletor_doenca("doenca_pe")
 selecionar_uf_pe <- seletor_uf("uf_pe")
 selecionar_ano_pe <- seletor_ano("ano_pe")
-botao_pe <- actionButton("update_pe", "Atualizar plot")
+botao_pe <- botao("update_pe")
 
-#Gráfico de barras----
+#Sexo e raça/cor----
 selecionar_doenca_estatistica_descritiva <- seletor_doenca("doenca_ed")
 selecionar_uf_ed <- seletor_uf("uf_ed")
 selecionar_dist_ed <- radioButtons("dist_ed", "Distribuir por", choices = c("Sexo" = "sexo", "Raça/cor" = "raca"))
-botao_ed <- actionButton("update_ed", "Atualizar plot")
+botao_ed <- botao("update_ed")
 
 #Série semanal----
-selecionar_doenca_sem <- pickerInput("doenca_sem", "Selecione a doença de interesse", choices = escolhas_doenca_semana)
+selecionar_doenca_sem <- seletor_doenca("doenca_sem", escolhas_doenca_semana)
 selecionar_uf_sem <- seletor_uf("uf_sem", multiplo = TRUE)
 selecionar_periodo_sem <- sliderInput("periodo_sem", "Período (ano da semana)", min = min(anos_disponiveis),
                                       max = max(anos_disponiveis), value = c(max(anos_disponiveis) - 2, max(anos_disponiveis)),
                                       step = 1, sep = "")
-botao_sem <- actionButton("update_sem", "Atualizar plot")
+botao_sem <- botao("update_sem")
 
 #Mapas----
+# O mapa mostra sempre a incidência (mapa de contagem bruta só repete a
+# população); a escolha vale para a ordem e os valores do ranking ao lado.
 selecionar_doenca_map <- seletor_doenca("doenca_map")
 selecionar_ano_map <- seletor_ano("ano_map")
-tipo_mapa <- radioButtons("tipo_mapa", "Selecione o tipo de mapa", choices = c("Casos Absolutos", "Incidência"))
-botao_map <- actionButton("update_map", "Atualizar plot")
+ranking_mapa <- radioButtons("ranking_map", "Ranking das UFs por", choices = c("Incidência" = "incidencia", "Casos" = "casos"))
+botao_map <- botao("update_map")
 
 #Animação de barras----
 # Id próprio: antes a animação reaproveitava o `tipo_mapa` do painel de mapas
 # (dois inputs com o mesmo id na página).
 selecionar_doenca_br <- seletor_doenca("doenca_br")
-tipo_br <- radioButtons("tipo_br", "Selecione o tipo de valor", choices = c("Casos Absolutos", "Incidência"))
-botao_br <- actionButton("update_br", "Atualizar plot")
+tipo_br <- radioButtons("tipo_br", "Valor", choices = c("Incidência", "Casos" = "Casos Absolutos"))
+botao_br <- botao("update_br")

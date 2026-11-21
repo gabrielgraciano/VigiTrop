@@ -4,13 +4,12 @@
 
 tendencia <- layout_sidebar(
   sidebar = sidebar(
-    pickerInput("doenca_tend", "Selecione a doença de interesse", choices = escolhas_doenca),
+    pickerInput("doenca_tend", "Doença", choices = escolhas_doenca),
     width = 280
   ),
   card(
     full_screen = TRUE,
-    card_header("Tendência da incidência no Brasil"),
-    highchartOutput("tend_plot", height = "420px"),
+    highchartOutput("tend_plot", height = "440px"),
     uiOutput("tend_tabela"),
     card_footer(uiOutput("nota_tend"))
   ),

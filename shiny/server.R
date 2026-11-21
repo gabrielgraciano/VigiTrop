@@ -1,30 +1,6 @@
-# Server. Os dados e os cálculos ficam em dados.R; aqui só entram a interface
-# e os gráficos. Cada gráfico é recalculado ao clicar em "Atualizar plot"
-# (e uma vez na abertura, com os valores padrão).
-
-OKABE_ITO <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#999999")
-COR_SEXO <- c(M = "#049899", F = "#ed9400")
-COR_RACA <- c("1" = "#56B4E9", "2" = "#0072B2", "3" = "#F0E442", "4" = "#E69F00", "5" = "#009E73", "9" = "#999999")
-COR_REGIAO <- c("Norte" = "#009E73", "Nordeste" = "#E69F00", "Sudeste" = "#0072B2", "Sul" = "#CC79A7", "Centro-Oeste" = "#D55E00")
-
-# Faixa cinza nos anos preliminares. Com `categorias` (eixo de categorias do
-# highcharter), a posição é o índice do ano, não o ano; com `datas = TRUE`
-# (eixo datetime), vai de 1º de janeiro a 31 de dezembro, em milissegundos.
-faixa_preliminar <- function(doenca, categorias = NULL, datas = FALSE) {
-  prelim <- arquivos$ano[arquivos$doenca == doenca & arquivos$status == "PRELIM"]
-  if (!length(prelim)) return(list())
-  if (datas) {
-    ms <- function(d) as.numeric(as.POSIXct(d, tz = "UTC")) * 1000
-    de <- ms(sprintf("%d-01-01", min(prelim)))
-    ate <- ms(sprintf("%d-12-31", max(prelim)))
-  } else {
-    pos <- if (is.null(categorias)) prelim else match(prelim, categorias) - 1
-    de <- min(pos) - 0.5
-    ate <- max(pos) + 0.5
-  }
-  list(list(from = de, to = ate, color = "rgba(0,0,0,0.05)",
-            label = list(text = "preliminar", style = list(color = "#888"))))
-}
+# Server. Os dados e os cálculos ficam em dados.R e os gráficos em graficos.R;
+# aqui só entram os filtros. Cada gráfico é recalculado ao clicar em
+# "Atualizar gráfico" (e uma vez na abertura, com os valores padrão).
 
 server <- function(input, output, session) {
 
@@ -38,53 +14,17 @@ server <- function(input, output, session) {
   output$tend_plot <- renderHighchart({
     r <- tend()
     validate(need(!is.null(r$t), "Tendência ainda não calculada. Rode o comando `tendencia` do pipeline."))
-    aj <- tendencia_ajustada(r$t)
-    usados <- r$obs[r$obs$ano %in% aj$ano, ]
-    fora <- r$obs[!r$obs$ano %in% aj$ano, ]
-    hc <- highchart() |>
-      hc_add_series(usados, "scatter", hcaes(x = ano, y = incidencia), name = "Observada",
-                    color = "#0072B2", marker = list(radius = 4))
-    if (nrow(fora) > 0) {
-      hc <- hc |> hc_add_series(fora, "scatter", hcaes(x = ano, y = incidencia), name = "Observada (preliminar, fora do modelo)",
-                                color = "#BBBBBB", marker = list(radius = 4))
-    }
-    for (s in unique(aj$segmento)) {
-      a <- aj[aj$segmento == s, ]
-      hc <- hc |> hc_add_series(a, "line", hcaes(x = ano, y = ajustada), name = paste("Segmento", s),
-                                color = OKABE_ITO[(s - 1) %% length(OKABE_ITO) + 1], marker = list(enabled = FALSE),
-                                enableMouseTracking = FALSE)
-    }
-    hc |>
-      hc_title(text = paste("Incidência de", nome_doenca(r$doenca), "e tendência ajustada")) |>
-      hc_xAxis(title = list(text = "Ano"), allowDecimals = FALSE) |>
-      hc_yAxis(title = list(text = "Por 100 mil habitantes"), min = 0) |>
-      hc_tooltip(valueDecimals = 2, headerFormat = "<b>{point.x}</b><br>") |>
-      hc_exporting(enabled = TRUE)
+    grafico_tendencia(r$t, r$obs, r$doenca)
   })
-
   output$tend_tabela <- renderUI({
     t <- tend()$t
-    if (is.null(t)) return(NULL)
-    fmt <- function(x) formatar_numero(x, 1)
-    linhas <- lapply(seq_len(nrow(t)), function(i) {
-      periodo <- if (t$tipo[i] == "AAPC") paste0("AAPC ", t$ano_inicio[i], "–", t$ano_fim[i]) else paste0(t$ano_inicio[i], "–", t$ano_fim[i])
-      sentido <- if (!t$significativo[i]) "Estável" else if (t$apc[i] > 0) "Crescente" else "Decrescente"
-      estilo <- if (t$tipo[i] == "AAPC") "font-weight:bold; border-top: 2px solid #ccc;" else ""
-      tags$tr(style = estilo,
-              tags$td(periodo),
-              tags$td(paste0(fmt(t$apc[i]), if (t$significativo[i]) "*" else "")),
-              tags$td(paste0("[", fmt(t$apc_ic_inf[i]), "; ", fmt(t$apc_ic_sup[i]), "]")),
-              tags$td(sentido))
-    })
-    tags$table(class = "table table-sm", style = "max-width: 640px; margin-top: 12px;",
-               tags$thead(tags$tr(tags$th("Período"), tags$th("APC (% ao ano)"), tags$th("IC 95%"), tags$th("Tendência"))),
-               tags$tbody(linhas))
+    if (!is.null(t)) tabela_tendencia(t)
   })
   output$nota_tend <- renderUI({
     r <- tend()
     aviso <- if (!is.null(r$t)) stats::na.omit(unique(r$t$aviso)) else character()
     nota_doenca(r$doenca, c(if (length(aviso)) paste(aviso, collapse = " "),
-                            "* IC 95% não contém o zero."))
+                            "Crescente ou decrescente: o IC 95% não contém o zero; estável: contém."))
   })
 
   #Série temporal----
@@ -97,31 +37,17 @@ server <- function(input, output, session) {
     linhas <- list()
     for (u in ufs_sel) for (s in sexos) {
       d <- serie_incidencia(doenca, u, s, faixas, periodicidade)
-      d$serie <- paste(nome_uf(u), rotulo_sexo(s), sep = ", ")
+      # O nome vai escrito no fim da linha: só a UF, e o sexo quando ele varia
+      d$serie <- if (length(sexos) > 1 || s != "Ambos") paste(nome_uf(u), rotulo_sexo(s), sep = " · ") else nome_uf(u)
       linhas[[length(linhas) + 1]] <- d
     }
-    list(doenca = doenca, periodicidade = periodicidade, dados = do.call(rbind, linhas))
+    detalhe <- if (!"Todos" %in% faixas) paste("Faixas etárias:", paste(faixas, collapse = ", "))
+    list(doenca = doenca, periodicidade = periodicidade, dados = do.call(rbind, linhas), detalhe = detalhe)
   }, ignoreNULL = FALSE)
 
   output$monthplot <- renderHighchart({
     r <- serie()
-    mensal <- r$periodicidade == "mensal"
-    hc <- if (mensal) {
-      hchart(r$dados, "line", hcaes(x = mes, y = incidencia, group = serie)) |>
-        hc_xAxis(title = list(text = "Mês"), type = "datetime", plotBands = faixa_preliminar(r$doenca, datas = TRUE)) |>
-        hc_tooltip(shared = TRUE, crosshairs = TRUE, valueDecimals = 3, xDateFormat = "%m/%Y") |>
-        hc_plotOptions(series = list(marker = list(enabled = FALSE)))
-    } else {
-      hchart(r$dados, "line", hcaes(x = ano, y = incidencia, group = serie)) |>
-        hc_xAxis(title = list(text = "Ano"), allowDecimals = FALSE, plotBands = faixa_preliminar(r$doenca)) |>
-        hc_tooltip(shared = TRUE, crosshairs = TRUE, valueDecimals = 2)
-    }
-    hc |>
-      hc_colors(OKABE_ITO) |>
-      hc_title(text = paste(if (mensal) "Incidência mensal de" else "Incidência de", nome_doenca(r$doenca))) |>
-      hc_yAxis(title = list(text = if (mensal) "Casos no mês por 100 mil habitantes" else "Taxa de incidência por 100 mil habitantes"), min = 0) |>
-      hc_legend(title = list(text = "UF, Sexo")) |>
-      hc_exporting(enabled = TRUE)
+    grafico_serie(r$dados, r$doenca, r$periodicidade == "mensal", r$detalhe)
   })
   output$nota_st <- renderUI({
     r <- serie()
@@ -138,28 +64,10 @@ server <- function(input, output, session) {
     list(doenca = doenca, uf = uf, ano = ano, dados = dados_piramide(doenca, uf, ano))
   }, ignoreNULL = FALSE)
 
-  output$piram_et <- renderPlotly({
+  output$piram_et <- renderHighchart({
     r <- piramide()
-    d <- r$dados
-    validate(need(sum(d$casos) > 0, "Não há casos para esse conjunto de filtros."))
-    m <- d[d$sexo == "M", ]
-    f <- d[d$sexo == "F", ]
-    marcas <- pretty(c(0, max(d$casos)), n = 4)
-    marcas <- c(-rev(marcas[-1]), marcas)
-    plot_ly() |>
-      add_bars(data = m, x = ~-casos, y = ~faixa_etaria, orientation = "h", name = "Masculino",
-               marker = list(color = COR_SEXO[["M"]]), text = ~formatar_numero(casos),
-               hovertemplate = "%{y}: %{text} casos<extra>Masculino</extra>", textposition = "none") |>
-      add_bars(data = f, x = ~casos, y = ~faixa_etaria, orientation = "h", name = "Feminino",
-               marker = list(color = COR_SEXO[["F"]]), text = ~formatar_numero(casos),
-               hovertemplate = "%{y}: %{text} casos<extra>Feminino</extra>", textposition = "none") |>
-      layout(
-        barmode = "overlay", bargap = 0.1,
-        title = sprintf("Pirâmide etária de %s, %s, %d", nome_doenca(r$doenca), nome_uf(r$uf), r$ano),
-        xaxis = list(title = "Casos", tickvals = marcas, ticktext = formatar_numero(abs(marcas))),
-        yaxis = list(title = "Faixa etária", categoryorder = "array", categoryarray = FAIXAS),
-        legend = list(title = list(text = "Sexo"))
-      )
+    validate(need(sum(r$dados$casos) > 0, "Não há casos para esse conjunto de filtros."))
+    grafico_piramide(r$dados, r$doenca, r$uf, r$ano)
   })
   output$nota_pe <- renderUI({
     r <- piramide()
@@ -167,7 +75,7 @@ server <- function(input, output, session) {
     nota_doenca(r$doenca, if (sem > 0) paste(formatar_numero(sem), "caso(s) com idade ignorada não aparecem na pirâmide."))
   })
 
-  #Gráfico de barras----
+  #Sexo e raça/cor----
   barras <- eventReactive(input$update_ed, {
     doenca <- validar(input$doenca_ed, escolhas_doenca)
     uf <- validar(input$uf_ed, escolhas_uf_brasil)
@@ -175,25 +83,10 @@ server <- function(input, output, session) {
     list(doenca = doenca, uf = uf, por = por, dados = dados_barras(doenca, uf, por))
   }, ignoreNULL = FALSE)
 
-  output$barplot_porcentagem <- renderHighchart({
+  output$barras <- renderUI({
     r <- barras()
-    d <- r$dados
-    serie_grupo <- function(g) lapply(which(d$grupo == g), function(i) list(y = d$porcentagem[i], casos = formatar_numero(d$casos[i])))
-    grupos <- if (r$por == "sexo") c("M" = "Masculino", "F" = "Feminino") else RACAS
-    cores <- if (r$por == "sexo") COR_SEXO else COR_RACA
-    hc <- highchart() |>
-      hc_chart(type = "column") |>
-      hc_xAxis(categories = unique(d$ano), title = list(text = "Ano"), plotBands = faixa_preliminar(r$doenca, unique(d$ano))) |>
-      hc_yAxis(title = list(text = "Porcentagem"), labels = list(format = "{value}%"), max = 100) |>
-      hc_plotOptions(column = list(stacking = "normal", reversedStacks = FALSE,
-                                   dataLabels = list(enabled = r$por == "sexo", format = "{point.y:.1f}%")))
-    for (g in names(grupos)) hc <- hc |> hc_add_series(data = serie_grupo(g), name = grupos[[g]], color = cores[[g]])
-    hc |>
-      hc_tooltip(shared = FALSE, headerFormat = "<b>{point.key}</b><br>",
-                 pointFormat = "{series.name}: {point.casos} casos ({point.y:.1f}%)") |>
-      hc_title(text = paste0("Distribuição percentual de casos de ", nome_doenca(r$doenca), " por ",
-                             if (r$por == "sexo") "sexo" else "raça/cor", ", ", nome_uf(r$uf))) |>
-      hc_exporting(enabled = TRUE)
+    validate(need(any(r$dados$casos > 0), "Não há casos para esse conjunto de filtros."))
+    if (r$por == "sexo") grafico_sexo(r$dados, r$doenca, r$uf) else paineis_raca(r$dados, r$doenca, r$uf)
   })
   output$nota_ed <- renderUI({
     r <- barras()
@@ -212,15 +105,7 @@ server <- function(input, output, session) {
   output$serie_semanal <- renderHighchart({
     r <- semanal()
     validate(need(nrow(r$dados) > 0, "Não há semanas nesse período."))
-    hchart(r$dados, "line", hcaes(x = inicio_semana, y = casos, group = uf)) |>
-      hc_colors(OKABE_ITO) |>
-      hc_title(text = paste("Casos de", nome_doenca(r$doenca), "por semana epidemiológica de início dos sintomas")) |>
-      hc_xAxis(title = list(text = "Semana (data de início)"), type = "datetime") |>
-      hc_yAxis(title = list(text = "Casos"), min = 0) |>
-      hc_tooltip(shared = TRUE, crosshairs = TRUE, xDateFormat = "Semana de %d/%m/%Y") |>
-      hc_plotOptions(series = list(marker = list(enabled = FALSE))) |>
-      hc_legend(title = list(text = "UF")) |>
-      hc_exporting(enabled = TRUE)
+    grafico_semanal(r$dados, r$doenca)
   })
   output$nota_sem <- renderUI(nota_doenca(semanal()$doenca, paste(
     "Semana epidemiológica de início dos sintomas (domingo a sábado), não ano de notificação: os totais",
@@ -231,44 +116,29 @@ server <- function(input, output, session) {
   mapa <- eventReactive(input$update_map, {
     doenca <- validar(input$doenca_map, escolhas_doenca)
     ano <- as.integer(validar(input$ano_map, as.character(anos_disponiveis)))
-    tipo <- validar(input$tipo_mapa, c("Casos Absolutos", "Incidência"))
-    list(doenca = doenca, ano = ano, tipo = tipo, dados = dados_mapa(doenca, ano))
+    por <- validar(input$ranking_map, c("incidencia", "casos"))
+    list(doenca = doenca, ano = ano, por = por, dados = dados_mapa(doenca, ano))
   }, ignoreNULL = FALSE)
 
+  output$mapa_titulo <- renderUI({
+    r <- mapa()
+    titulo_mapa(r$doenca, r$ano, r$dados)
+  })
   output$mapa_incid <- renderLeaflet({
     r <- mapa()
-    m <- r$dados
-    absoluto <- r$tipo == "Casos Absolutos"
-    valor <- if (absoluto) m$casos else m$incidencia
-    pal <- colorBin("YlOrRd", domain = c(0, max(valor, 1, na.rm = TRUE)), bins = 7, pretty = TRUE)
-    rotulo <- if (absoluto) {
-      paste0(m$NM_UF, ": ", formatar_numero(m$casos), " casos")
-    } else {
-      paste0(m$NM_UF, ": ", formatar_numero(m$incidencia, 2), " por 100 mil hab. (", formatar_numero(m$casos), " casos)")
-    }
-    titulo <- paste0(if (absoluto) "Casos" else "Incidência", " de ", nome_doenca(r$doenca), ", ", r$ano)
-    leaflet(m, options = leafletOptions(minZoom = 3, maxZoom = 10)) |>
-      setView(lng = -54, lat = -15, zoom = 4) |>
-      addTiles() |>
-      addControl(tags$b(titulo), position = "topright") |>
-      addPolygons(
-        fillColor = pal(valor), weight = 1.5, opacity = 1, color = "white", fillOpacity = 0.75,
-        highlightOptions = highlightOptions(weight = 3, color = "#666", fillOpacity = 0.85, bringToFront = TRUE),
-        label = rotulo,
-        labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "14px")
-      ) |>
-      addLegend(pal = pal, values = valor, opacity = 0.75, position = "bottomright",
-                title = if (absoluto) "Casos" else "Por 100 mil hab.",
-                labFormat = function(type, cuts, p) {
-                  # labelFormat(big.mark = ".") conflita com o ponto decimal padrão
-                  d <- if (absoluto) 0 else 2
-                  paste0(formatar_numero(utils::head(cuts, -1), d), " – ", formatar_numero(cuts[-1], d))
-                })
+    grafico_mapa(r$dados, r$doenca, r$ano)
+  })
+  output$ranking_uf <- renderHighchart({
+    r <- mapa()
+    grafico_ranking(r$dados, r$doenca, r$ano, r$por)
   })
   output$nota_map <- renderUI({
     r <- mapa()
     sem <- attr(r$dados, "sem_uf")
-    nota_doenca(r$doenca, if (sem > 0) paste(formatar_numero(sem), "caso(s) com UF de residência ignorada não aparecem no mapa."))
+    nota_doenca(r$doenca, c(
+      "Mapa: incidência, para não confundir mais casos com mais população. Faixas pelos quintis das UFs com casos.",
+      if (sem > 0) paste(formatar_numero(sem), "caso(s) com UF de residência ignorada não aparecem no mapa nem no ranking.")
+    ))
   })
 
   #Animação de barras----
@@ -282,36 +152,7 @@ server <- function(input, output, session) {
 
   output$bar_chart_race <- renderPlotly({
     r <- corrida()
-    d <- r$dados
-    d$texto <- paste0(d$sigla, "  ", formatar_numero(d$valor, if (r$tipo == "Incidência") 2 else 0))
-    p <- plot_ly(d, x = ~valor, y = ~posicao, frame = ~ano, ids = ~sigla, type = "bar", orientation = "h",
-            marker = list(color = unname(COR_REGIAO[d$regiao])), text = ~texto, textposition = "outside",
-            hovertemplate = "%{text}<extra></extra>", cliponaxis = FALSE) |>
-      layout(
-        title = paste0(if (r$tipo == "Incidência") "Incidência (por 100 mil hab.)" else "Casos",
-                       " de ", nome_doenca(r$doenca), ": ranking das UFs"),
-        yaxis = list(autorange = "reversed", showticklabels = FALSE, title = "", dtick = 1),
-        xaxis = list(title = if (r$tipo == "Incidência") "Por 100 mil habitantes" else "Casos"),
-        margin = list(r = 40),
-        showlegend = FALSE
-      ) |>
-      animation_opts(frame = 900, transition = 500, redraw = FALSE) |>
-      animation_slider(currentvalue = list(prefix = "Ano: "))
-    # Eixo x de cada ano no máximo daquele ano: com um eixo só (máximo de todos
-    # os anos), um ano de epidemia achata as barras dos outros.
-    p <- plotly_build(p)
-    maximos <- tapply(d$valor, d$ano, max)
-    primeiro <- names(maximos)[1]
-    for (i in seq_along(p$x$frames)) {
-      m <- maximos[[p$x$frames[[i]]$name]]
-      p$x$frames[[i]]$layout <- list(xaxis = list(range = c(0, max(m, 1e-9) * 1.18)))
-    }
-    p$x$layout$xaxis$range <- c(0, max(maximos[[primeiro]], 1e-9) * 1.18)
-    p
+    grafico_corrida(r$dados, r$doenca, r$tipo)
   })
-  output$nota_br <- renderUI({
-    regioes <- lapply(names(COR_REGIAO), function(n) tags$span(style = paste0("color:", COR_REGIAO[[n]], ";font-weight:bold"), n))
-    legenda <- tagList("Cores por região: ", do.call(tagList, utils::head(rbind(regioes, list(", ")), -1)))
-    nota_doenca(corrida()$doenca, legenda)
-  })
+  output$nota_br <- renderUI(nota_doenca(corrida()$doenca, legenda_regioes()))
 }

@@ -97,6 +97,8 @@ somar_por_ano <- function(valores, anos_obs, anos) {
 }
 
 # ---- cálculos ----------------------------------------------------------------
+# As taxas saem sem arredondar: o arredondamento é só na exibição (graficos.R),
+# senão 1 caso de raiva numa UF grande vira 0,00 e some do mapa.
 
 #' Incidência por 100 mil, anual ou mensal. `uf` = código IBGE ou "BR"; `sexo`
 #' = M, F ou "Ambos"; `faixas` = vetor de faixas ou "Todos". Brasil inclui casos
@@ -119,14 +121,14 @@ serie_incidencia <- function(doenca, uf, sexo, faixas, periodicidade = c("anual"
   p <- somar_por_ano(ps$populacao, ps$ano, anos)
   if (periodicidade == "anual") {
     n <- somar_por_ano(cs$casos, cs$ano, anos)
-    return(data.frame(ano = anos, casos = n, populacao = p, incidencia = round(n / p * 1e5, 2)))
+    return(data.frame(ano = anos, casos = n, populacao = p, incidencia = n / p * 1e5))
   }
   ultimo <- max(casos_mes$mes[casos_mes$doenca == doenca])
   meses <- seq(as.Date(sprintf("%d-01-01", min(anos))), ultimo, by = "month")
   n <- tapply(cs$casos, factor(as.character(cs$mes), levels = as.character(meses)), sum)
   n[is.na(n)] <- 0
   pop_mes <- p[match(as.integer(format(meses, "%Y")), anos)]
-  data.frame(mes = meses, casos = as.numeric(n), populacao = pop_mes, incidencia = round(as.numeric(n) / pop_mes * 1e5, 3))
+  data.frame(mes = meses, casos = as.numeric(n), populacao = pop_mes, incidencia = as.numeric(n) / pop_mes * 1e5)
 }
 
 #' Casos e incidência por UF num ano (para o mapa). Casos com UF ignorada ficam
@@ -140,7 +142,7 @@ dados_mapa <- function(doenca, ano) {
   m$casos <- as.numeric(n_uf[as.character(m$CD_UF)])
   m$casos[is.na(m$casos)] <- 0
   m$populacao <- as.numeric(p_uf[as.character(m$CD_UF)])
-  m$incidencia <- round(m$casos / m$populacao * 1e5, 2)
+  m$incidencia <- m$casos / m$populacao * 1e5
   attr(m, "sem_uf") <- sum(sel$casos[is.na(sel$uf)])
   m
 }
@@ -197,7 +199,7 @@ dados_corrida <- function(doenca, tipo) {
   grade$casos[is.na(grade$casos)] <- 0
   p <- tapply(populacao$populacao, paste(populacao$ano, populacao$uf), sum)
   grade$populacao <- as.numeric(p[paste(grade$ano, grade$uf)])
-  grade$valor <- if (tipo == "Incidência") round(grade$casos / grade$populacao * 1e5, 2) else grade$casos
+  grade$valor <- if (tipo == "Incidência") grade$casos / grade$populacao * 1e5 else grade$casos
   grade$sigla <- ufs$SIGLA_UF[match(grade$uf, ufs$CD_UF)]
   grade$regiao <- c("1" = "Norte", "2" = "Nordeste", "3" = "Sudeste", "4" = "Sul", "5" = "Centro-Oeste")[as.character(grade$uf %/% 10)]
   grade <- grade[order(grade$ano, -grade$valor, grade$sigla), ]
