@@ -248,7 +248,7 @@ grafico_barras <- function(d, doenca, uf, por = c("sexo", "raca")) {
     hc_tooltip(headerFormat = "<b>{point.key}</b><br/>", pointFormat = "{series.name}: {point.casos} casos ({point.y:.1f}%)") |>
     # No celular, 20 colunas não cabem: as barras deitam (um ano por linha)
     compacto(list(chart = list(inverted = TRUE, marginRight = 24), legend = list(reversed = sexo),
-                  yAxis = list(labels = list(rotation = 0)))) |>
+                  yAxis = list(labels = list(rotation = 0), tickInterval = 50))) |>
     exportacao(doenca, if (sexo) "sexo" else "raca_cor")
 }
 
