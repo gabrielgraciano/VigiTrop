@@ -1,0 +1,96 @@
+# Atualização mensal dos dados do VigiTrop.
+#
+# Roda o pipeline (PySUS → silver → gold → tendência → validação) num runner
+# do GitHub e publica o gold como release ("dados-AAAAMMDD-HHMM"), com os
+# arquivos gold.tar.gz e gold.tar.gz.sha256. A VM da UNIFESP não roda o
+# pipeline (a CPU virtual dela não tem x86-64-v2, exigido pelo NumPy 2.4+):
+# ela só baixa a release mais recente (scripts/atualizar_da_release.sh).
+#
+# O gold só tem agregados (contagens por doença, ano, UF, sexo, faixa e raça).
+name: Atualizar dados
+
+on:
+  schedule:
+    - cron: "23 9 3 * *"   # todo dia 3, às 09:23 UTC (06:23 em Brasília); só roda a partir da main
+  workflow_dispatch:       # botão "Run workflow" na aba Actions
+  push:                    # teste: roda quando este arquivo muda na branch de trabalho
+    branches: [claude/trusting-pasteur-bsuang]
+    paths: [.github/workflows/atualizar_dados.yml]
+
+permissions:
+  contents: write          # para criar a release
+
+concurrency:
+  group: atualizar-dados
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      # Brutos e silver da execução anterior: o pipeline só baixa/refaz o que mudou
+      - name: Restaurar dados da execução anterior
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/cache
+            data/bronze
+            data/silver
+          key: dados-${{ github.run_id }}
+          restore-keys: dados-
+
+      - name: Montar a imagem do pipeline
+        run: docker compose build pipeline
+
+      - name: Rodar o pipeline
+        run: docker compose run --rm pipeline executar
+
+      - name: Guardar dados para a próxima execução
+        if: always() && hashFiles('data/bronze/manifesto.csv') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/cache
+            data/bronze
+            data/silver
+          key: dados-${{ github.run_id }}
+
+      - name: Conferir e empacotar o gold
+        run: |
+          set -euo pipefail
+          for f in casos.parquet casos_mes.parquet casos_semana.parquet populacao.parquet \
+                   doencas.parquet arquivos.parquet tendencia.parquet meta.json; do
+            test -s "data/gold/$f" || { echo "faltou data/gold/$f"; exit 1; }
+          done
+          tar -czf gold.tar.gz -C data gold
+          sha256sum gold.tar.gz > gold.tar.gz.sha256
+          ls -la gold.tar.gz && cat gold.tar.gz.sha256
+          {
+            echo "Dados gerados pelo pipeline do VigiTrop (workflow \`${GITHUB_WORKFLOW}\`, execução ${GITHUB_RUN_ID})."
+            echo
+            echo "A VM baixa \`gold.tar.gz\` desta release com \`scripts/atualizar_da_release.sh\`."
+            echo
+            echo '```json'
+            cat data/gold/meta.json
+            echo '```'
+            echo
+            echo '```'
+            grep -h -A 12 "Validação contra a Tabela 1" data/logs/executar_*.log | sed 's/^.\{20\}//' || true
+            echo '```'
+          } > notas.md
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="dados-$(date -u +%Y%m%d-%H%M)"
+          gh release create "$tag" gold.tar.gz gold.tar.gz.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Dados VigiTrop $(date -u +%Y-%m-%d)" \
+            --notes-file notas.md \
+            --latest
+          echo "Publicada: $tag"
