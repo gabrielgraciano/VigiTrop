@@ -177,77 +177,47 @@ grafico_semanal <- function(dados, doenca) {
 
 # ---- distribuição por sexo e por raça/cor --------------------------------
 
-#' Sexo: colunas 100% empilhadas (só dois grupos), com 50% marcado.
-grafico_sexo <- function(d, doenca, uf) {
+#' Sexo ou raça/cor: colunas 100% empilhadas, uma por ano, com o nome de cada
+#' grupo ao lado da última coluna (sem legenda). No sexo, o valor vai dentro da
+#' coluna e a linha tracejada marca 50%; na raça/cor, que tem fatias finas, o
+#' valor fica no tooltip.
+grafico_barras <- function(d, doenca, uf, por = c("sexo", "raca")) {
+  por <- match.arg(por)
+  sexo <- por == "sexo"
+  grupos <- if (sexo) c(M = "Masculino", F = "Feminino") else RACAS
+  cores <- if (sexo) COR_SEXO else COR_RACA
+  # Cores claras não dão contraste como texto: nelas o nome vai em cinza-escuro
+  cor_texto <- if (sexo) COR_SEXO else COR_RACA_TEXTO
   anos <- sort(unique(d$ano))
   prelim <- setdiff(anos, anos_finais(doenca))
   rotulos <- ifelse(anos %in% prelim, paste0(anos, "*"), anos)
-  serie <- function(g) list_parse(data.frame(y = d$porcentagem[d$grupo == g], casos = formatar_numero(d$casos[d$grupo == g])))
-  highchart(height = 600) |>
-    hc_chart(type = "column", marginRight = margem_rotulos("Masculino"), events = list(render = JS("VT.rotulosFinais"))) |>
-    hc_add_series(data = serie("M"), name = "Masculino", color = COR_SEXO[["M"]]) |>
-    hc_add_series(data = serie("F"), name = "Feminino", color = COR_SEXO[["F"]]) |>
-    hc_plotOptions(column = list(stacking = "normal", reversedStacks = FALSE, pointPadding = 0.08, groupPadding = 0,
-                                 dataLabels = list(enabled = TRUE, format = "{point.y:.0f}%",
+  hc <- highchart(height = 600) |>
+    hc_chart(type = "column", marginRight = margem_rotulos(grupos), events = list(render = JS("VT.rotulosFinais")))
+  for (g in names(grupos)) {
+    x <- d[d$grupo == g, ]
+    x <- x[match(anos, x$ano), ]
+    hc <- hc |> hc_add_series(
+      data = list_parse(data.frame(y = x$porcentagem, casos = formatar_numero(ifelse(is.na(x$casos), 0, x$casos)))),
+      name = grupos[[g]], color = cores[[g]], vtCorRotulo = cor_texto[[g]]
+    )
+  }
+  hc |>
+    hc_plotOptions(column = list(stacking = "normal", pointPadding = 0.08, groupPadding = 0,
+                                 dataLabels = list(enabled = sexo, format = "{point.y:.0f}%",
                                                    style = list(color = "#FFFFFF", fontSize = "12px", fontWeight = "500")))) |>
-    hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por sexo, ", nome_uf(uf), ", ", periodo_anos(anos))) |>
-    hc_subtitle(text = paste0("% dos casos de cada ano. Casos com sexo ignorado ficam fora da conta.",
+    hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por ", if (sexo) "sexo" else "raça/cor", ", ",
+                           nome_uf(uf), ", ", periodo_anos(anos))) |>
+    hc_subtitle(text = paste0("% dos casos de cada ano.",
+                              if (sexo) " Casos com sexo ignorado ficam fora da conta." else " Raça/cor em branco entra como Ignorada.",
                               if (length(prelim)) " * Dados preliminares." else "")) |>
     hc_xAxis(categories = rotulos, labels = list(autoRotation = FALSE, step = 1)) |>
+    # Na raça/cor, a primeira série (Branca) vai embaixo e "Ignorada" no topo
     hc_yAxis(max = 100, tickInterval = 25, labels = list(format = "{value}%"), title = list(text = ""),
-             plotLines = list(list(value = 50, color = CORES$tinta, width = 1, dashStyle = "Dash", zIndex = 5))) |>
+             reversedStacks = sexo,
+             plotLines = if (sexo) list(list(value = 50, color = CORES$tinta, width = 1, dashStyle = "Dash", zIndex = 5))) |>
     hc_legend(enabled = FALSE) |>
     hc_tooltip(headerFormat = "<b>{point.key}</b><br/>", pointFormat = "{series.name}: {point.casos} casos ({point.y:.1f}%)") |>
-    exportacao(doenca, "sexo")
-}
-
-#' Raça/cor: um painel por grupo (receita 14), mesma escala em todos. Em cada
-#' painel, o grupo em azul e os outros em cinza; a manchete dá o valor do último
-#' ano fechado e a variação desde o primeiro ano.
-paineis_raca <- function(d, doenca, uf) {
-  anos <- sort(unique(d$ano))
-  finais <- intersect(anos_finais(doenca), anos)
-  ref <- if (length(finais)) max(finais) else max(anos)
-  ordem <- d[d$ano == ref & d$grupo != "9", ]
-  ordem <- c(ordem$grupo[order(-ordem$porcentagem)], "9")
-  teto <- ceiling(max(d$porcentagem, na.rm = TRUE) / 10) * 10
-  bandas <- faixa_preliminar(doenca, anos)
-  if (length(bandas)) bandas[[1]]$label <- NULL
-
-  painel <- function(g) {
-    foco <- d[d$grupo == g, ]
-    inicio <- foco$porcentagem[foco$ano == min(anos)]
-    fim <- foco$porcentagem[foco$ano == ref]
-    delta <- round(fim) - round(inicio)
-    manchete <- if (is.na(fim)) "Sem casos" else paste0(
-      formatar_numero(fim, 0), "% em ", ref, " · ",
-      if (is.na(inicio)) "" else if (delta == 0) paste("igual a", min(anos)) else paste(com_sinal(delta, 0), "p.p. desde", min(anos))
-    )
-    hc <- highchart(height = 235) |>
-      hc_chart(type = "line", spacing = list(8, 8, 8, 0)) |>
-      hc_xAxis(categories = anos, plotBands = bandas, tickInterval = max(1, ceiling(length(anos) / 4)), labels = list(step = 1)) |>
-      hc_yAxis(min = 0, max = teto, tickAmount = 3, labels = list(format = "{value}%"), title = list(text = "")) |>
-      hc_legend(enabled = FALSE) |>
-      hc_tooltip(headerFormat = "<b>{point.key}</b><br/>", pointFormat = "{series.name}: {point.y:.1f}% ({point.casos} casos)")
-    for (o in setdiff(names(RACAS), g)) {
-      hc <- hc |> hc_add_series(data = d$porcentagem[d$grupo == o], name = RACAS[[o]], color = CORES$contexto,
-                                lineWidth = 1.25, opacity = 0.5, enableMouseTracking = FALSE, zIndex = 1)
-    }
-    hc <- hc |> hc_add_series(data = list_parse(data.frame(y = foco$porcentagem, casos = formatar_numero(foco$casos))),
-                              name = RACAS[[g]], color = CORES$destaque, lineWidth = 3, zIndex = 2)
-    tags$div(class = "vt-painel",
-             tags$p(class = "vt-painel-nome", RACAS[[g]]),
-             tags$p(class = "vt-painel-manchete", manchete),
-             hc)
-  }
-  tags$div(
-    class = "vt-bloco",
-    tags$p(class = "vt-titulo", paste0("Casos de ", nome_doenca(doenca), " por raça/cor, ", nome_uf(uf), ", ", periodo_anos(anos))),
-    tags$p(class = "vt-subtitulo",
-           "% dos casos de cada ano. Em cada painel, a linha azul é o grupo do painel e as cinzas, os demais; todos na mesma escala.",
-           if (length(bandas)) " A faixa cinza marca os anos preliminares."),
-    tags$div(class = "vt-grade-paineis", lapply(ordem, painel))
-  )
+    exportacao(doenca, if (sexo) "sexo" else "raca_cor")
 }
 
 # ---- pirâmide etária -----------------------------------------------------
@@ -313,20 +283,34 @@ taxa_brasil <- function(doenca, ano) {
   s$incidencia[s$ano == ano]
 }
 
-titulo_mapa <- function(doenca, ano, m) {
-  casas <- casas_taxa(m$incidencia)
+#' Valor do mapa e do ranking (incidência ou casos), com as casas decimais.
+valor_mapa <- function(m, por) {
+  if (por == "incidencia") list(valor = m$incidencia, casas = casas_taxa(m$incidencia))
+  else list(valor = m$casos, casas = 0)
+}
+
+titulo_mapa <- function(doenca, ano, m, por = c("incidencia", "casos")) {
+  por <- match.arg(por)
+  br <- serie_incidencia(doenca, BRASIL, "Ambos", "Todos")
+  br <- br[br$ano == ano, ]
   tagList(
-    tags$p(class = "vt-titulo", paste0("Incidência de ", nome_doenca(doenca), " por UF, ", ano)),
-    tags$p(class = "vt-subtitulo", paste0("Casos por 100 mil habitantes. Brasil: ",
-                                          formatar_numero(taxa_brasil(doenca, ano), casas), "."))
+    tags$p(class = "vt-titulo", paste0(if (por == "incidencia") "Incidência" else "Casos", " de ",
+                                       nome_doenca(doenca), " por UF, ", ano)),
+    tags$p(class = "vt-subtitulo", if (por == "incidencia") {
+      paste0("Casos por 100 mil habitantes. Brasil: ", formatar_numero(br$incidencia, casas_taxa(m$incidencia)), ".")
+    } else {
+      paste0("Casos notificados, pela UF de residência. Brasil: ", formatar_numero(br$casos), " casos.")
+    })
   )
 }
 
-grafico_mapa <- function(m, doenca, ano) {
-  casas <- casas_taxa(m$incidencia)
-  cl <- classes_mapa(m$incidencia, casas, m$casos)
-  rotulo <- paste0("<b>", m$NM_UF, "</b><br/>", formatar_numero(m$incidencia, casas), " por 100 mil hab.<br/>",
-                   formatar_numero(m$casos), " casos")
+grafico_mapa <- function(m, doenca, ano, por = c("incidencia", "casos")) {
+  por <- match.arg(por)
+  v <- valor_mapa(m, por)
+  cl <- classes_mapa(v$valor, v$casas, m$casos)
+  casas_inc <- casas_taxa(m$incidencia)
+  rotulo <- paste0("<b>", m$NM_UF, "</b><br/>", formatar_numero(m$casos), " casos<br/>",
+                   formatar_numero(m$incidencia, casas_inc), " por 100 mil hab.")
   leaflet(m, options = leafletOptions(minZoom = 3, maxZoom = 8, zoomSnap = 0.25, attributionControl = FALSE)) |>
     fitBounds(-73.5, -33.5, -34.8, 5.2) |>
     addPolygons(
@@ -337,7 +321,8 @@ grafico_mapa <- function(m, doenca, ano) {
                                   textsize = "13px", direction = "auto")
     ) |>
     addLegend(colors = cl$cores, labels = cl$rotulos, opacity = 1, position = "bottomleft",
-              title = "por 100 mil hab.<br/><span style='font-weight:400'>(quintis das UFs)</span>")
+              title = paste0(if (por == "incidencia") "por 100 mil hab." else "casos",
+                             "<br/><span style='font-weight:400'>(quintis das UFs)</span>"))
 }
 
 #' Ranking das UFs (receita 1), na cor da classe do mapa: o gráfico também serve
@@ -345,27 +330,27 @@ grafico_mapa <- function(m, doenca, ano) {
 #' quanto a primeira UF concentra.
 grafico_ranking <- function(m, doenca, ano, por = c("incidencia", "casos")) {
   por <- match.arg(por)
-  casas <- casas_taxa(m$incidencia)
-  m$cor <- classes_mapa(m$incidencia, casas, m$casos)$cor
+  v <- valor_mapa(m, por)
+  m$cor <- classes_mapa(v$valor, v$casas, m$casos)$cor
+  m$valor <- v$valor
   m <- sf::st_drop_geometry(m)
-  m$valor <- m[[por]]
   m <- m[order(-m$valor, m$NM_UF), ]
-  rotulo <- if (por == "incidencia") formatar_numero(m$valor, casas) else formatar_numero(m$valor)
-  pontos <- list_parse(data.frame(y = m$valor, color = m$cor, rotulo = rotulo,
-                                  casos = formatar_numero(m$casos), incid = formatar_numero(m$incidencia, casas)))
-  br <- taxa_brasil(doenca, ano)
+  casas_inc <- casas_taxa(m$incidencia)
+  pontos <- list_parse(data.frame(y = m$valor, color = m$cor, rotulo = formatar_numero(m$valor, v$casas),
+                                  casos = formatar_numero(m$casos), incid = formatar_numero(m$incidencia, casas_inc)))
   if (por == "incidencia") {
+    br <- taxa_brasil(doenca, ano)
     acima <- sum(m$incidencia > br, na.rm = TRUE)
     titulo <- paste0(acima, " das 27 UFs ficaram acima da taxa do Brasil")
     sub <- paste0("Incidência por 100 mil habitantes, ", ano, ". Linha tracejada: Brasil.")
     linhas <- list(list(value = br, color = CORES$tinta, width = 1.5, dashStyle = "Dash", zIndex = 2,
-                        label = list(text = paste("Brasil", formatar_numero(br, casas)), rotation = 0, align = "left",
+                        label = list(text = paste("Brasil", formatar_numero(br, casas_inc)), rotation = 0, align = "left",
                                      verticalAlign = "bottom", x = 4, y = -4,
                                      style = list(color = CORES$tinta, fontWeight = "600", fontSize = "13px"))))
   } else {
     total <- sum(m$casos)
     titulo <- if (total > 0) paste0(m$NM_UF[1], " teve ", formatar_numero(100 * m$casos[1] / total, 0), "% dos casos") else "Nenhum caso no ano"
-    sub <- paste0("Casos em ", ano, ". A cor é a da incidência, como no mapa.")
+    sub <- paste0("Casos em ", ano, ", pela UF de residência.")
     linhas <- list()
   }
   highchart() |>
@@ -375,13 +360,14 @@ grafico_ranking <- function(m, doenca, ano, por = c("incidencia", "casos")) {
                                     zIndex = 6, style = list(fontSize = "12px", textOutline = "3px #FFFFFF"))) |>
     hc_plotOptions(bar = list(pointPadding = 0.12, groupPadding = 0, borderWidth = 0)) |>
     hc_xAxis(categories = m$NM_UF, lineColor = CORES$tinta, tickLength = 0, labels = list(step = 1, style = list(fontSize = "12px"))) |>
-    hc_yAxis(min = 0, maxPadding = 0.12, gridLineWidth = 0, labels = list(enabled = FALSE), title = list(text = ""),
+    # Folga à direita para o rótulo da maior barra (ex.: 890.805) não cortar
+    hc_yAxis(min = 0, maxPadding = 0.22, gridLineWidth = 0, labels = list(enabled = FALSE), title = list(text = ""),
              plotLines = linhas) |>
     hc_title(text = titulo, style = list(fontSize = "16px")) |>
     hc_subtitle(text = sub, style = list(fontSize = "13px")) |>
     hc_legend(enabled = FALSE) |>
     hc_tooltip(headerFormat = "<b>{point.key}</b><br/>",
-               pointFormat = "{point.incid} por 100 mil hab.<br/>{point.casos} casos") |>
+               pointFormat = "{point.casos} casos<br/>{point.incid} por 100 mil hab.") |>
     exportacao(doenca, "ranking_ufs")
 }
 

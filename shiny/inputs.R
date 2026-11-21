@@ -49,11 +49,10 @@ selecionar_periodo_sem <- sliderInput("periodo_sem", "Período (ano da semana)",
 botao_sem <- botao("update_sem")
 
 #Mapas----
-# O mapa mostra sempre a incidência (mapa de contagem bruta só repete a
-# população); a escolha vale para a ordem e os valores do ranking ao lado.
+# Um mapa só, com o ranking das UFs ao lado; a escolha vale para os dois.
 selecionar_doenca_map <- seletor_doenca("doenca_map")
 selecionar_ano_map <- seletor_ano("ano_map")
-ranking_mapa <- radioButtons("ranking_map", "Ranking das UFs por", choices = c("Incidência" = "incidencia", "Casos" = "casos"))
+tipo_mapa <- radioButtons("tipo_mapa", "Mostrar", choices = c("Incidência" = "incidencia", "Casos absolutos" = "casos"))
 botao_map <- botao("update_map")
 
 #Animação de barras----

@@ -14,7 +14,7 @@ ui <- page_navbar(
                   condition = "input.navset == 'Mapas'",
                   selecionar_doenca_map,
                   selecionar_ano_map,
-                  ranking_mapa,
+                  tipo_mapa,
                   botao_map
                 ),
                 conditionalPanel(

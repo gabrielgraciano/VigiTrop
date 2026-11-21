@@ -83,10 +83,10 @@ server <- function(input, output, session) {
     list(doenca = doenca, uf = uf, por = por, dados = dados_barras(doenca, uf, por))
   }, ignoreNULL = FALSE)
 
-  output$barras <- renderUI({
+  output$barras <- renderHighchart({
     r <- barras()
     validate(need(any(r$dados$casos > 0), "Não há casos para esse conjunto de filtros."))
-    if (r$por == "sexo") grafico_sexo(r$dados, r$doenca, r$uf) else paineis_raca(r$dados, r$doenca, r$uf)
+    grafico_barras(r$dados, r$doenca, r$uf, r$por)
   })
   output$nota_ed <- renderUI({
     r <- barras()
@@ -116,17 +116,17 @@ server <- function(input, output, session) {
   mapa <- eventReactive(input$update_map, {
     doenca <- validar(input$doenca_map, escolhas_doenca)
     ano <- as.integer(validar(input$ano_map, as.character(anos_disponiveis)))
-    por <- validar(input$ranking_map, c("incidencia", "casos"))
+    por <- validar(input$tipo_mapa, c("incidencia", "casos"))
     list(doenca = doenca, ano = ano, por = por, dados = dados_mapa(doenca, ano))
   }, ignoreNULL = FALSE)
 
   output$mapa_titulo <- renderUI({
     r <- mapa()
-    titulo_mapa(r$doenca, r$ano, r$dados)
+    titulo_mapa(r$doenca, r$ano, r$dados, r$por)
   })
   output$mapa_incid <- renderLeaflet({
     r <- mapa()
-    grafico_mapa(r$dados, r$doenca, r$ano)
+    grafico_mapa(r$dados, r$doenca, r$ano, r$por)
   })
   output$ranking_uf <- renderHighchart({
     r <- mapa()
@@ -136,7 +136,7 @@ server <- function(input, output, session) {
     r <- mapa()
     sem <- attr(r$dados, "sem_uf")
     nota_doenca(r$doenca, c(
-      "Mapa: incidência, para não confundir mais casos com mais população. Faixas pelos quintis das UFs com casos.",
+      "Cores pelos quintis das UFs com casos. Casos absolutos acompanham o tamanho da população; para comparar o risco entre UFs, use a incidência.",
       if (sem > 0) paste(formatar_numero(sem), "caso(s) com UF de residência ignorada não aparecem no mapa nem no ranking.")
     ))
   })

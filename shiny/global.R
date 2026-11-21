@@ -34,6 +34,10 @@ CORES <- list(
 # então a cor nunca é a única pista.
 PALETA <- c("#2563EB", "#B45309", "#1E2024", "#0E7C7B", "#7B3294", "#64748B", "#BE185D", "#4D7C0F")
 COR_SEXO <- c(M = "#2563EB", F = "#B45309")
+# Raça/cor (colunas empilhadas): claras e escuras alternadas, para as fatias
+# vizinhas se separarem também no daltonismo; "Ignorada" em cinza, no topo.
+COR_RACA <- c("1" = "#93C5FD", "2" = "#2563EB", "3" = "#F59E0B", "4" = "#B45309", "5" = "#0E7C7B", "9" = CORES$contexto)
+COR_RACA_TEXTO <- replace(COR_RACA, c("1", "3", "9"), c(CORES$tinta, CORES$tinta, CORES$tinta_suave))
 # Regiões: Norte e Nordeste em laranjas, Sudeste e Sul em azuis, Centro-Oeste em
 # cinza, com luminosidades diferentes. Testado nos três tipos de daltonismo
 # (menor ΔE entre duas regiões: 23); cada barra também leva a sigla da UF.

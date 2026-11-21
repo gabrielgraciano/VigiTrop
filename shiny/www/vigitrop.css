@@ -48,16 +48,7 @@ body { font-variant-numeric: lining-nums; }
 .card-footer { background: #fff; }
 .card-footer p { margin-bottom: 0.35rem; }
 
-/* Títulos de painel fora do Highcharts (small multiples). */
-.vt-painel { min-width: 0; }
-.vt-painel-nome { font-size: 14px; color: var(--vt-tinta-suave); margin: 0; }
-.vt-painel-manchete { font-size: 15px; font-weight: 600; color: var(--vt-tinta); margin: 0 0 2px; }
-.vt-grade-paineis {
-  display: grid; gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-@media (max-width: 1100px) { .vt-grade-paineis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .vt-grade-paineis { grid-template-columns: minmax(0, 1fr); } }
-.vt-bloco { display: block; }
+/* Título e subtítulo do mapa, fora do Leaflet. */
 .vt-titulo { font-size: 18px; font-weight: 600; color: var(--vt-tinta); margin: 0; line-height: 1.3; }
 .vt-subtitulo { font-size: 14px; color: var(--vt-tinta-suave); margin: 4px 0 16px; }
 
