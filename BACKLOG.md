@@ -33,6 +33,10 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 
 ## Outras pendências
 
+- **Tendência: corrigir a autocorrelação dos resíduos (confirmado, 22/11/2026).** O TCC usou o Joinpoint (NCI) com autocorrelação de 1ª ordem estimada a partir dos dados. A versão atual (`pipeline/vigitrop_pipeline/tendencia.py`) ajusta por mínimos quadrados comuns, como se os anos fossem independentes. Os joinpoints e os APCs mudam pouco, mas os IC 95% podem estar estreitos demais e uma tendência pode deixar de ser significativa. O que fazer:
+  - estimar a autocorrelação AR(1) dos resíduos e reajustar com a transformação de Prais-Winsten, como o Joinpoint faz ("autocorrelated errors: estimate from data"), mantendo a busca dos joinpoints e o BIC;
+  - testes em `pipeline/tests/test_tendencia.py`, comparação com a Tabela 1 do TCC (`config/tcc_joinpoint.csv`) e o texto do Método na aba Tendência (`shiny/tendencia.R`);
+  - junto, avaliar o IC condicional à posição do joinpoint: hoje a incerteza sobre o ano da dobra não entra no intervalo.
 - **Deploy na VM (20/11/2026).** O app está montado na VM e em teste na porta 2103. O pipeline não roda lá, porque a CPU virtual não tem x86-64-v2 (NumPy ≥ 2.4); ele roda no GitHub Actions e publica o gold como release. Falta: a troca para a porta 2102; o cron diário do `scripts/atualizar_da_release.sh`; e juntar a branch na `main`, para o agendamento mensal do Actions valer. Opcional: pedir à TI para trocar o tipo de CPU da VM.
 - **Deploy na VM: caminho da URL.** O app antigo ficava em `/srv/shiny-server/app_ec`. O novo responde em `/` e em `/app_ec/`. Confirmar para onde o proxy de `vigitrop.unifesp.br` aponta.
 - **Definição alternativa no app.** O gold já tem todas as contagens (confirmados, prováveis, regra do TCC). O app mostra só a padrão de cada doença; dá para oferecer a troca na interface.
