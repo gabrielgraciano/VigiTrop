@@ -562,14 +562,17 @@ titulo_tendencia <- function(doenca, t) {
   ), " desde ", ult$ano_inicio)
 }
 
-grafico_tendencia <- function(t, obs, doenca) {
+#' `log`: eixo y em escala logarítmica, onde o modelo (reta no log da taxa) aparece como retas.
+grafico_tendencia <- function(t, obs, doenca, log = FALSE) {
   aj <- tendencia_ajustada(t)
   seg <- t[t$tipo == "APC", ]
   aapc <- t[t$tipo == "AAPC", ]
   casas <- casas_taxa(obs$incidencia)
   usados <- obs[obs$ano %in% aj$ano, ]
   fora <- obs[!obs$ano %in% aj$ano, ]
-  pontos_obs <- function(x) list_parse(data.frame(x = x$ano, y = x$incidencia, casos = formatar_numero(x$casos)))
+  # No log, ano com zero casos fica sem ponto (o log de zero não existe)
+  pontos_obs <- function(x) list_parse(data.frame(x = x$ano, y = if (log) ifelse(x$incidencia > 0, x$incidencia, NA) else x$incidencia,
+                                                  casos = formatar_numero(x$casos)))
   hc <- highchart() |>
     hc_add_series(data = pontos_obs(usados), type = "scatter", name = "Taxa observada", color = CORES$contexto,
                   lineWidth = 0, marker = list(enabled = TRUE, radius = 5, symbol = "circle"), zIndex = 2,
@@ -616,7 +619,9 @@ grafico_tendencia <- function(t, obs, doenca) {
       if (nrow(aapc)) paste0(" Variação média do período (AAPC): ", com_sinal(aapc$apc[1], 1), "% ao ano.") else ""
     )) |>
     hc_xAxis(allowDecimals = FALSE, tickInterval = if (diff(range(obs$ano)) > 12) 2 else 1) |>
-    hc_yAxis(min = 0, title = list(text = "por 100 mil hab."), plotLines = linha_base()) |>
+    hc_yAxis(type = if (log) "logarithmic" else "linear", min = if (!log) 0,
+             title = list(text = if (log) "por 100 mil hab. (escala log)" else "por 100 mil hab."),
+             plotLines = if (log) list() else linha_base()) |>
     hc_legend(enabled = FALSE) |>
     hc_tooltip(headerFormat = "") |>
     # No celular, o APC de cada segmento fica só na tabela abaixo (o rótulo

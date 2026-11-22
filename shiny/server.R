@@ -14,7 +14,7 @@ server <- function(input, output, session) {
   output$tend_plot <- renderHighchart({
     r <- tend()
     validate(need(!is.null(r$t), "Tendência ainda não calculada. Rode o comando `tendencia` do pipeline."))
-    grafico_tendencia(r$t, r$obs, r$doenca)
+    grafico_tendencia(r$t, r$obs, r$doenca, log = isTRUE(input$log_tend))
   })
   output$tend_tabela <- renderUI({
     t <- tend()$t
