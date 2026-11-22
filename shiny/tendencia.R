@@ -5,6 +5,7 @@
 tendencia <- layout_sidebar(
   sidebar = sidebar(
     pickerInput("doenca_tend", "Doença", choices = escolhas_doenca),
+    input_switch("log_tend", "Escala log"),
     width = 280,
     # No celular, os filtros vêm antes do gráfico (antes ficavam no fim da página)
     open = list(desktop = "open", mobile = "always-above")
