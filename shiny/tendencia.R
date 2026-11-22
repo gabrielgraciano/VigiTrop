@@ -37,9 +37,9 @@ tendencia <- layout_sidebar(
         "Se o IC 95% contiver o zero, a tendência é dita estável, caso contrário, é crescente ou decrescente."
       ),
       tags$p(
-        "Entram só os anos com dados finais (os preliminares ainda mudam). O cálculo é refeito a cada",
-        "atualização dos dados, então pode diferir do TCC (2024), que usou o Joinpoint com teste de",
-        "permutação, intervalo empírico e os dados disponíveis em 2024."
+        "Como o cálculo é refeito a cada atualização dos dados, os números podem diferir do TCC (2024),",
+        "que usou o Joinpoint com teste de permutação, intervalo empírico e os dados disponíveis em 2024.",
+        "Observação: entram só anos com dados finais, já que os preliminares ainda mudam."
       ),
       tags$details(
         tags$summary("Resultado publicado no TCC (Joinpoint 5.2.0, dados coletados em 2024)"),
