@@ -32,9 +32,9 @@ tendencia <- layout_sidebar(
         "intervalo de 95% pela t de Student. Como a taxa de um ano costuma se parecer com a do ano anterior,",
         "os erros podem ter autocorrelação de 1ª ordem: com os pontos de inflexão escolhidos, o modelo é",
         "reestimado levando isso em conta (autocorrelação estimada dos dados, como no Joinpoint do TCC),",
-        "o que corrige sobretudo a largura dos intervalos. A variação percentual anual média (AAPC) resume o período:",
-        "é a média dos coeficientes dos segmentos, ponderada pelo número de anos. A tendência é",
-        "considerada crescente ou decrescente quando o IC 95% não contém o zero; caso contrário, estável."
+        "o que corrige sobretudo a largura dos intervalos. A variação percentual anual média (AAPC), por sua vez,",
+        "é a média dos coeficientes dos segmentos ponderada pelo número de anos, o que resume o período.",
+        "Se o IC 95% contiver o zero, a tendência é dita estável, caso contrário, é crescente ou decrescente."
       ),
       tags$p(
         "Entram só os anos com dados finais (os preliminares ainda mudam). O cálculo é refeito a cada",
