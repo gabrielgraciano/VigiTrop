@@ -74,11 +74,13 @@ class TestAjuste(unittest.TestCase):
         self.assertAlmostEqual(aj.aapc.ic_inf, seg.ic_inf, places=10)  # um segmento: AAPC = APC, mesmo IC
 
     def test_cobertura_ic(self):
-        # Sem quebra e com k fixo em 0, o IC95% (t de Student) deve cobrir o APC verdadeiro ~95% das vezes.
+        # Sem quebra, k fixo em 0 e sem a correção de autocorrelação (erros independentes, como
+        # aqui), o IC95% (t de Student) deve cobrir o APC verdadeiro ~95% das vezes.
         anos = list(range(2007, 2023))
         cobre = sum(seg.ic_inf < 4.0 < seg.ic_sup
                     for s in range(400)
-                    for seg in ajustar(anos, serie(anos, [4.0], [], ruido=0.1, semente=s), k_max=0).segmentos)
+                    for seg in ajustar(anos, serie(anos, [4.0], [], ruido=0.1, semente=s), k_max=0,
+                                       autocorrelacao=False).segmentos)
         self.assertTrue(0.92 <= cobre / 400 <= 0.98, cobre)
 
     def test_falso_joinpoint(self):
@@ -130,6 +132,61 @@ class TestAjuste(unittest.TestCase):
     def test_rejeita_taxa_zero(self):
         with self.assertRaises(ValueError):
             ajustar([2000, 2001, 2002, 2003], [1.0, 0.0, 1.0, 1.0])
+
+
+def serie_ar1(anos: list[int], apc: float, rho: float, sd: float, semente: int) -> list[float]:
+    """Taxas com APC conhecido e erro AR(1) estacionário no log (inovação com desvio `sd`)."""
+    rnd = random.Random(semente)
+    e, taxas = 0.0, []
+    for i, t in enumerate(serie(anos, [apc], [])):
+        inov = rnd.gauss(0, sd)
+        e = inov / math.sqrt(1 - rho * rho) if i == 0 else rho * e + inov
+        taxas.append(t * math.exp(e))
+    return taxas
+
+
+class TestAutocorrelacao(unittest.TestCase):
+    """Erros AR(1): ρ por REML e reestimação por Prais-Winsten com os joinpoints fixos."""
+
+    anos = list(range(2007, 2026))  # 19 anos, como as séries do app
+
+    def _cobertura(self, rho: float, correcao: bool, n_sim: int = 300) -> float:
+        cobre = 0
+        for s in range(n_sim):
+            (seg,) = ajustar(self.anos, serie_ar1(self.anos, 4.0, rho, 0.1, s), k_max=0,
+                             autocorrelacao=correcao).segmentos
+            cobre += seg.ic_inf < 4.0 < seg.ic_sup
+        return cobre / n_sim
+
+    def test_reml_quase_sem_vies(self):
+        # A autocorrelação simples dos resíduos daria ~0,3 para ρ = 0,6 e ~−0,1 para ρ = 0.
+        for rho, faixa in ((0.6, (0.42, 0.66)), (0.0, (-0.07, 0.07))):
+            media = sum(ajustar(self.anos, serie_ar1(self.anos, 4.0, rho, 0.1, s), k_max=0).rho
+                        for s in range(200)) / 200
+            self.assertTrue(faixa[0] < media < faixa[1], (rho, media))
+
+    def test_cobertura_com_autocorrelacao(self):
+        # Com ρ = 0,6, sem a correção o IC cobre ~67% das vezes; com ela, ~88% (medido).
+        sem, com = self._cobertura(0.6, False), self._cobertura(0.6, True)
+        self.assertGreaterEqual(com, 0.82)
+        self.assertGreaterEqual(com - sem, 0.10, (sem, com))
+
+    def test_cobertura_sem_autocorrelacao(self):
+        # Com ρ = 0, a correção custa pouco: ~92% de cobertura (sem ela, ~95%).
+        self.assertGreaterEqual(self._cobertura(0.0, True), 0.88)
+
+    def test_joinpoints_iguais_aos_do_ajuste_comum(self):
+        anos = list(range(2005, 2025))
+        taxas = serie(anos, [5.0, -8.0], [2014], ruido=0.05, semente=3)
+        com, sem = ajustar(anos, taxas), ajustar(anos, taxas, autocorrelacao=False)
+        self.assertEqual(com.joinpoints, sem.joinpoints)
+        self.assertEqual(sem.rho, 0.0)
+        self.assertEqual(com.gl, sem.gl - 1)  # o ρ custa um grau de liberdade
+
+    def test_sem_ruido_rho_zero(self):
+        anos = list(range(2000, 2020))
+        aj = ajustar(anos, serie(anos, [10.0, -5.0], [2005]))
+        self.assertEqual(aj.rho, 0.0)
 
 
 class TestSerie(unittest.TestCase):

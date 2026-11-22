@@ -11,8 +11,25 @@ Modelo, por doença (t = ano):
   quadrados ordinários, variância constante). O k vem do menor BIC, na forma do
   Joinpoint: ln(SQR/n) + (2k + 2)·ln(n)/n (conta também as posições dos joinpoints).
   O TCC usou o teste de permutação do Joinpoint; aqui é BIC.
+- Erros com autocorrelação de 1ª ordem, AR(1), estimada a partir dos dados, como
+  no Joinpoint do TCC ("autocorrelated errors: estimate from data"). Com os
+  joinpoints escolhidos, o modelo é reestimado por mínimos quadrados
+  generalizados: dados transformados por Prais-Winsten (y_t − ρ·y_{t−1}; o 1º ano
+  multiplicado por √(1 − ρ²)), com ρ por máxima verossimilhança restrita (REML,
+  busca em grade de −0,95 a 0,95). Isso corrige as inclinações e, sobretudo, os IC.
+  Por que assim (medido em simulação, 600 séries de 12 a 19 anos):
+  - a autocorrelação simples dos resíduos subestima o ρ em séries curtas (ρ = 0,6
+    sai ~0,3; ρ = 0 sai ~−0,12) e chega a estreitar o IC; o REML quase não tem viés
+    (0,6 → ~0,53; 0 → ~0,00);
+  - com ρ = 0,6, o IC95% cobre o valor verdadeiro em ~88% das vezes (sem a
+    correção, ~67%); com ρ = 0, em ~92% (sem a correção, ~95%: estimar o ρ custa
+    um pouco quando ele não existe);
+  - a escolha dos joinpoints fica nos mínimos quadrados ordinários: estimar o ρ
+    dentro da busca (por candidato, ou no modelo com o máximo de joinpoints) fazia
+    o BIC achar joinpoints falsos com mais frequência.
+  Com `autocorrelacao=False`, fica só o ajuste ordinário (ρ = 0).
 - APC do segmento = 100·(exp(inclinação) − 1). IC95% pela t de Student com
-  gl = n − 2k − 2, com o erro-padrão da inclinação do segmento. É condicional às
+  gl = n − 2k − 2 (− 1 pelo ρ), com o erro-padrão da inclinação do segmento. É condicional às
   posições dos joinpoints (não inclui a incerteza delas), como o método
   paramétrico do Joinpoint; o TCC usou o método empírico (bootstrap), que dá
   intervalos assimétricos e mais largos.
@@ -42,6 +59,7 @@ data/gold/tendencia.parquet (formato longo, uma linha por segmento + uma de AAPC
   taxa_inicio, taxa_fim incidência ajustada pelo modelo (por 100 mil) nos dois anos-limite
   joinpoints, n_anos    joinpoints do modelo escolhido e anos usados no ajuste
   aviso                 anos com zero casos (corrigidos) ou falta de anos; NULL se nada
+  autocorrelacao        ρ estimado (AR(1)) do modelo escolhido
 """
 
 from __future__ import annotations
@@ -71,6 +89,8 @@ PARAMETROS_POR_JOINPOINT = 2  # penalidade do BIC: (2k + 2) parâmetros, como no
 MIN_OBS_PONTA = 2  # observações antes do 1º joinpoint e depois do último (fora o joinpoint)
 MIN_OBS_ENTRE = 2  # observações entre dois joinpoints (fora os joinpoints)
 MEIO_CASO = 0.5  # somado aos anos com zero casos
+AUTOCORRELACAO = True  # erros AR(1) com ρ estimado dos dados, como o Joinpoint do TCC
+GRADE_RHO = np.linspace(-0.95, 0.95, 191)  # valores de ρ testados no REML (passo 0,01)
 Z_975 = NormalDist().inv_cdf(0.975)
 
 
@@ -188,6 +208,7 @@ class Ajuste:
     sse: float
     gl: int
     bic: float
+    rho: float = 0.0  # autocorrelação AR(1) dos erros (0 = sem correção)
 
     @property
     def limites(self) -> list[int]:
@@ -242,12 +263,61 @@ def _mqo(x: np.ndarray, y: np.ndarray, joinpoints: tuple[float, ...]) -> tuple[n
     return coef, float(resid @ resid), X
 
 
+def _prais_winsten(m: np.ndarray, rho: float) -> np.ndarray:
+    """Tira a autocorrelação AR(1): linha t vira m_t − ρ·m_{t−1}; a 1ª, √(1 − ρ²)·m_1. Vale para y e para X."""
+    t = np.array(m, dtype=float, copy=True)
+    t[1:] = m[1:] - rho * m[:-1]
+    t[0] = math.sqrt(1 - rho * rho) * m[0]
+    return t
+
+
+def _ar1_reml(x: np.ndarray, y: np.ndarray, joinpoints: tuple[float, ...]
+              ) -> tuple[float, np.ndarray, float, np.ndarray]:
+    """Modelo com erros AR(1), joinpoints fixos: ρ por máxima verossimilhança restrita (REML).
+
+    Para cada ρ da grade, ajusta nos dados transformados (Prais-Winsten) e calcula
+    a log-verossimilhança restrita (sem constantes):
+        −½·[(n − p)·ln(SQR/(n − p)) − ln(1 − ρ²) + ln det(X*'X*)]
+    Devolve ρ, coeficientes (escala original), SQR e matriz transformadas.
+    Sem resíduo (ajuste perfeito), ρ = 0.
+    """
+    X = _matriz(x, joinpoints)
+    n, p = X.shape
+    coef, sse, _ = _mqo(x, y, joinpoints)
+    if sse < 1e-20:
+        return 0.0, coef, sse, X
+    melhor: tuple[float, float, np.ndarray, float, np.ndarray] | None = None
+    for rho in GRADE_RHO:
+        Xt, yt = _prais_winsten(X, rho), _prais_winsten(y, rho)
+        c, *_ = np.linalg.lstsq(Xt, yt, rcond=None)
+        resid = yt - Xt @ c
+        s_ = float(resid @ resid)
+        ll = -0.5 * ((n - p) * math.log(max(s_, 1e-300) / (n - p)) - math.log(1 - rho * rho)
+                     + np.linalg.slogdet(Xt.T @ Xt)[1])
+        if melhor is None or ll > melhor[0]:
+            melhor = (ll, float(rho), c, s_, Xt)
+    _, rho, c, s_, Xt = melhor
+    return rho, c, s_, Xt
+
+
+def _melhor_posicao(x: np.ndarray, y: np.ndarray, k: int) -> tuple[float, tuple[int, ...], np.ndarray, np.ndarray] | None:
+    """Posição dos k joinpoints com a menor SQR (busca exaustiva, mínimos quadrados ordinários)."""
+    achado = None
+    for idx in candidatos(len(x), k):
+        coef, sse, X = _mqo(x, y, tuple(x[i] for i in idx))
+        if achado is None or sse < achado[0]:
+            achado = (sse, idx, coef, X)
+    return achado
+
+
 def ajustar(anos: list[int], taxas: list[float], k_max: int | None = None,
-            por_joinpoint: int = PARAMETROS_POR_JOINPOINT) -> Ajuste:
+            por_joinpoint: int = PARAMETROS_POR_JOINPOINT, autocorrelacao: bool = AUTOCORRELACAO) -> Ajuste:
     """Escolhe o número e a posição dos joinpoints (BIC) e ajusta o modelo log-linear.
 
-    BIC = ln(SQR/n) + (por_joinpoint·k + 2)·ln(n)/n. `por_joinpoint` = 2 é o BIC
-    do Joinpoint; 3 é o BIC3 (mais conservador).
+    BIC = ln(SQR/n) + (por_joinpoint·k + 2)·ln(n)/n, nos mínimos quadrados
+    ordinários. `por_joinpoint` = 2 é o BIC do Joinpoint; 3 é o BIC3 (mais
+    conservador). `autocorrelacao`: com os joinpoints escolhidos, reestima o modelo
+    com erros AR(1) (ρ por REML, Prais-Winsten).
     """
     if len(anos) != len(taxas) or len(anos) < 3:
         raise ValueError("são precisos ao menos 3 anos com taxa")
@@ -260,26 +330,29 @@ def ajustar(anos: list[int], taxas: list[float], k_max: int | None = None,
     y = np.log(np.array(taxas, dtype=float))
     k_max = max_joinpoints(n) if k_max is None else k_max
 
-    melhor: Ajuste | None = None
+    # 1) Número e posição dos joinpoints: mínimos quadrados ordinários + BIC
+    escolhido: tuple[float, int, float, tuple[int, ...], np.ndarray, np.ndarray] | None = None
     for k in range(k_max + 1):
-        gl = n - 2 * k - 2
-        if gl < 1:
+        if n - 2 * k - 2 < 1:
             break
-        achado: tuple[float, tuple[int, ...], np.ndarray, np.ndarray] | None = None
-        for idx in candidatos(n, k):
-            jps = tuple(x[i] for i in idx)
-            coef, sse, X = _mqo(x, y, jps)
-            if achado is None or sse < achado[0]:
-                achado = (sse, idx, coef, X)
+        achado = _melhor_posicao(x, y, k)
         if achado is None:
             break  # poucos anos para k joinpoints com os mínimos exigidos
         sse, idx, coef, X = achado
         bic = math.log(max(sse / n, 1e-12)) + (por_joinpoint * k + 2) * math.log(n) / n
-        if melhor is None or bic < melhor.bic:
-            cov = sse / gl * np.linalg.inv(X.T @ X)
-            melhor = Ajuste(tuple(anos), tuple(taxas), tuple(anos[i] for i in idx), coef, cov, sse, gl, bic)
-    assert melhor is not None
-    return melhor
+        if escolhido is None or bic < escolhido[0]:
+            escolhido = (bic, k, sse, idx, coef, X)
+    assert escolhido is not None
+    bic, k, sse, idx, coef, X = escolhido
+    jps = tuple(x[i] for i in idx)
+    rho, gl = 0.0, n - 2 * k - 2
+
+    # 2) Com os joinpoints fixos: erros AR(1), ρ por REML (Prais-Winsten)
+    if autocorrelacao and gl - 1 >= 1:
+        rho, coef, sse, X = _ar1_reml(x, y, jps)
+        gl -= 1  # o ρ também foi estimado
+    cov = sse / gl * np.linalg.inv(X.T @ X)
+    return Ajuste(tuple(anos), tuple(taxas), tuple(anos[i] for i in idx), coef, cov, sse, gl, bic, rho)
 
 
 # ---------------------------------------------------------------------------
@@ -352,14 +425,14 @@ class _Gold:
 COLUNAS_GOLD = (
     "doenca VARCHAR, definicao VARCHAR, tipo VARCHAR, segmento SMALLINT, ano_inicio SMALLINT, ano_fim SMALLINT, "
     "apc DOUBLE, apc_ic_inf DOUBLE, apc_ic_sup DOUBLE, significativo BOOLEAN, taxa_inicio DOUBLE, taxa_fim DOUBLE, "
-    "joinpoints SMALLINT, n_anos SMALLINT, aviso VARCHAR"
+    "joinpoints SMALLINT, n_anos SMALLINT, aviso VARCHAR, autocorrelacao DOUBLE"
 )
 
 
 def _linhas_gold(d: Doenca, definicao: str, aj: Ajuste, aviso: str | None) -> list[tuple]:
     def linha(tipo: str, seg: int | None, t: Tendencia) -> tuple:
         return (d.slug, definicao, tipo, seg, t.ano_inicio, t.ano_fim, t.apc, t.ic_inf, t.ic_sup,
-                t.significativo, t.taxa_inicio, t.taxa_fim, len(aj.joinpoints), len(aj.anos), aviso)
+                t.significativo, t.taxa_inicio, t.taxa_fim, len(aj.joinpoints), len(aj.anos), aviso, aj.rho)
 
     return [linha("APC", i, t) for i, t in enumerate(aj.segmentos, 1)] + [linha("AAPC", None, aj.aapc)]
 
@@ -382,14 +455,14 @@ def _execucao_app(dados: _Gold, cfg: Config, destino: Path) -> None:
         aviso = "; ".join(avisos) or None
         aj = ajustar(s.anos, s.taxas)
         linhas += _linhas_gold(d, d.padrao, aj, aviso)
-        log.info("  %-4s %-26s %s | %d joinpoint(s): %s | AAPC %s", d.codigo, d.padrao, _faixas(finais),
-                 len(aj.joinpoints), " | ".join(t.texto() for t in aj.segmentos), aj.aapc.texto(periodo=False))
+        log.info("  %-4s %-26s %s | %d joinpoint(s): %s | AAPC %s | rho %+.2f", d.codigo, d.padrao, _faixas(finais),
+                 len(aj.joinpoints), " | ".join(t.texto() for t in aj.segmentos), aj.aapc.texto(periodo=False), aj.rho)
         if aviso:
             log.warning("  %-4s %s", d.codigo, aviso)
 
     con = duckdb.connect()
     con.execute(f"CREATE TABLE t ({COLUNAS_GOLD})")
-    con.executemany(f"INSERT INTO t VALUES ({', '.join('?' * 15)})", linhas)
+    con.executemany(f"INSERT INTO t VALUES ({', '.join('?' * 16)})", linhas)
     tmp = destino.with_suffix(".tmp.parquet")
     con.execute(f"COPY (SELECT * FROM t ORDER BY doenca, tipo DESC, segmento) TO {literal(str(tmp))} (FORMAT parquet, COMPRESSION zstd)")
     con.close()
@@ -448,7 +521,7 @@ def _execucao_tcc(dados: _Gold, cfg: Config, destino: Path) -> None:
                 "mesmo_sentido": (apc_tcc > 0) == (nosso.apc > 0),
                 "mesma_significancia": sig_tcc == nosso.significativo,
                 "tcc_joinpoints": len(segs_tcc) - 1, "joinpoints": len(aj.joinpoints),
-                "segmentos_vigitrop": nossos, "aviso": "; ".join(avisos),
+                "segmentos_vigitrop": nossos, "autocorrelacao": round(aj.rho, 3), "aviso": "; ".join(avisos),
             })
         log.info("    VigiTrop: %s", nossos)
         if avisos:

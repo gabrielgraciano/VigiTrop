@@ -28,7 +28,10 @@ tendencia <- layout_sidebar(
       ),
       tags$p(
         "A variação percentual anual (APC) de cada segmento é 100·(e", tags$sup("b"), " − 1), com",
-        "intervalo de 95% pela t de Student. A variação percentual anual média (AAPC) resume o período:",
+        "intervalo de 95% pela t de Student. Como a taxa de um ano costuma se parecer com a do ano anterior,",
+        "os erros podem ter autocorrelação de 1ª ordem: com os pontos de inflexão escolhidos, o modelo é",
+        "reestimado levando isso em conta (autocorrelação estimada dos dados, como no Joinpoint do TCC),",
+        "o que corrige sobretudo a largura dos intervalos. A variação percentual anual média (AAPC) resume o período:",
         "é a média dos coeficientes dos segmentos, ponderada pelo número de anos. A tendência é",
         "considerada crescente ou decrescente quando o IC 95% não contém o zero; caso contrário, estável."
       ),
