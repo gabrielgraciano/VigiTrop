@@ -32,6 +32,29 @@ casas_taxa <- function(x) {
 #' Espaço à direita para o nome das séries no fim das linhas.
 margem_rotulos <- function(nomes) min(260, ceiling(max(nchar(nomes)) * 7.6 + 24))
 
+#' Período para título, sem vírgula: "em 2025" ou "de 2007 a 2026".
+periodo_titulo <- function(anos) {
+  anos <- range(anos)
+  if (anos[1] == anos[2]) paste("em", anos[1]) else paste0("de ", anos[1], " a ", anos[2])
+}
+
+# Preposição de cada UF ("no Acre", "na Bahia", "em São Paulo")
+PREPOSICAO_UF <- c(
+  "Brasil" = "no", "Acre" = "no", "Alagoas" = "em", "Amapá" = "no", "Amazonas" = "no", "Bahia" = "na",
+  "Ceará" = "no", "Distrito Federal" = "no", "Espírito Santo" = "no", "Goiás" = "em", "Maranhão" = "no",
+  "Mato Grosso" = "em", "Mato Grosso do Sul" = "em", "Minas Gerais" = "em", "Pará" = "no", "Paraíba" = "na",
+  "Paraná" = "no", "Pernambuco" = "em", "Piauí" = "no", "Rio de Janeiro" = "no", "Rio Grande do Norte" = "no",
+  "Rio Grande do Sul" = "no", "Rondônia" = "em", "Roraima" = "em", "Santa Catarina" = "em", "São Paulo" = "em",
+  "Sergipe" = "em", "Tocantins" = "no"
+)
+
+#' Lugar para título: "no Brasil", "em São Paulo", "na Bahia".
+lugar_titulo <- function(uf) {
+  nome <- nome_uf(uf)
+  prep <- PREPOSICAO_UF[nome]
+  paste(if (is.na(prep)) "em" else prep, nome)
+}
+
 periodo_anos <- function(anos) {
   anos <- range(anos)
   if (anos[1] == anos[2]) as.character(anos[1]) else paste0(anos[1], "–", anos[2])
@@ -149,7 +172,6 @@ grafico_serie <- function(dados, doenca, mensal, detalhe = NULL) {
     hc <- hc |> hc_add_series(data = pontos, name = nomes[i], color = PALETA[(i - 1) %% length(PALETA) + 1],
                               lineWidth = if (um) 3 else 2.5)
   }
-  periodo <- if (mensal) paste0(mes_ano(min(dados$mes)), "–", mes_ano(max(dados$mes))) else periodo_anos(dados$ano)
   sub <- paste0(if (mensal) "Casos notificados no mês por 100 mil habitantes" else "Casos por 100 mil habitantes, por ano de notificação",
                 if (length(detalhe)) paste0(". ", detalhe) else "")
   bandas <- if (mensal) faixa_preliminar(doenca, datas = TRUE) else faixa_preliminar(doenca)
@@ -159,7 +181,9 @@ grafico_serie <- function(dados, doenca, mensal, detalhe = NULL) {
     list(allowDecimals = FALSE, plotBands = bandas)
   }
   hc |>
-    hc_title(text = paste0("Incidência ", if (mensal) "mensal " else "", "de ", nome_doenca(doenca), ", ", periodo)) |>
+    hc_title(text = paste0("Incidência ", if (mensal) "mensal " else "", "de ", nome_doenca(doenca), " ",
+                           if (mensal) paste0("de ", mes_ano(min(dados$mes)), " a ", mes_ano(max(dados$mes)))
+                           else periodo_titulo(dados$ano))) |>
     hc_subtitle(text = sub) |>
     hc_xAxis(eixo_x) |>
     hc_yAxis(min = 0, title = list(text = "por 100 mil hab."), plotLines = linha_base()) |>
@@ -191,7 +215,7 @@ grafico_semanal <- function(dados, doenca) {
   anos <- as.integer(format(range(dados$inicio_semana), "%Y"))
   bandas <- faixa_preliminar(doenca, datas = TRUE)
   hc |>
-    hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por semana epidemiológica, ", periodo_anos(anos))) |>
+    hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por semana epidemiológica ", periodo_titulo(anos))) |>
     hc_subtitle(text = "Casos por semana de início dos sintomas. As semanas mais recentes ainda estão incompletas.") |>
     hc_xAxis(type = "datetime", plotBands = bandas,
              dateTimeLabelFormats = list(week = "%d/%m/%Y", month = "%b/%Y", year = "%Y")) |>
@@ -234,8 +258,8 @@ grafico_barras <- function(d, doenca, uf, por = c("sexo", "raca")) {
     hc_plotOptions(column = list(stacking = "normal", pointPadding = 0.08, groupPadding = 0,
                                  dataLabels = list(enabled = sexo, format = "{point.y:.0f}%",
                                                    style = list(color = "#FFFFFF", fontSize = "12px", fontWeight = "500")))) |>
-    hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por ", if (sexo) "sexo" else "raça/cor", ", ",
-                           nome_uf(uf), ", ", periodo_anos(anos))) |>
+    hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por ", if (sexo) "sexo" else "raça/cor", " ",
+                           lugar_titulo(uf), " ", periodo_titulo(anos))) |>
     hc_subtitle(text = paste0("% dos casos de cada ano.",
                               if (sexo) " Casos com sexo ignorado ficam fora da conta." else " Raça/cor em branco entra como Ignorada.",
                               if (length(prelim)) " * Dados preliminares." else "")) |>
@@ -293,7 +317,7 @@ paineis_raca <- function(d, doenca, uf) {
   }
   tags$div(
     class = "vt-bloco",
-    tags$p(class = "vt-titulo", paste0("Casos de ", nome_doenca(doenca), " por raça/cor, ", nome_uf(uf), ", ", periodo_anos(anos))),
+    tags$p(class = "vt-titulo", paste0("Casos de ", nome_doenca(doenca), " por raça/cor ", lugar_titulo(uf), " ", periodo_titulo(anos))),
     tags$p(class = "vt-subtitulo",
            "% dos casos de cada ano. Em cada painel, a linha azul é o grupo do painel e as cinzas, os demais; todos na mesma escala.",
            if (length(bandas)) " A faixa cinza marca os anos preliminares."),
@@ -329,7 +353,7 @@ grafico_piramide <- function(d, doenca, uf, ano) {
     hc_yAxis(min = -m * 1.08, max = m * 1.08, tickPositions = marcas, endOnTick = FALSE, startOnTick = FALSE,
              title = list(text = ""), plotLines = linha_base(),
              labels = list(formatter = JS("VT.rotuloAbs"))) |>
-    hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por faixa etária e sexo, ", nome_uf(uf), ", ", ano)) |>
+    hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por faixa etária e sexo ", lugar_titulo(uf), " em ", ano)) |>
     hc_subtitle(text = paste0(formatar_numero(total), " casos com sexo e idade conhecidos; ",
                               formatar_numero(pct_f, 0), "% no sexo feminino.")) |>
     hc_legend(enabled = FALSE) |>
@@ -390,7 +414,7 @@ titulo_mapa <- function(doenca, ano, m, por = c("incidencia", "casos")) {
   br <- br[br$ano == ano, ]
   tagList(
     tags$p(class = "vt-titulo", paste0(if (por == "incidencia") "Incidência" else "Casos", " de ",
-                                       nome_doenca(doenca), " por UF, ", ano)),
+                                       nome_doenca(doenca), " por UF em ", ano)),
     tags$p(class = "vt-subtitulo", if (por == "incidencia") {
       paste0("Casos por 100 mil habitantes. Brasil: ", formatar_numero(br$incidencia, casas_taxa(m$incidencia)), ".")
     } else {
@@ -501,9 +525,9 @@ grafico_calor <- function(d, doenca, tipo) {
   separadores <- lapply(utils::head(fim_regiao, -1) - 0.5, function(v) list(value = v, color = "#FFFFFF", width = 4, zIndex = 5))
 
   hc <- highchart(height = 700) |>
-    hc_chart(type = "heatmap", spacingRight = 8) |>
+    hc_chart(type = "heatmap", spacingRight = 8, events = list(render = JS("VT.calorSemSalto"))) |>
     hc_add_series(data = pontos, name = if (incid) "Incidência" else "Casos", borderWidth = 1, borderColor = "#FFFFFF",
-                  showInLegend = FALSE, colsize = 1, rowsize = 1)
+                  showInLegend = FALSE)
   # Legenda das faixas: séries vazias, só para aparecer na legenda (da menor
   # para a maior; "sem casos" no fim)
   ordem <- rev(seq_along(cl$cores))
@@ -513,7 +537,7 @@ grafico_calor <- function(d, doenca, tipo) {
                               marker = list(symbol = "square", radius = 6), enableMouseTracking = FALSE)
   }
   hc |>
-    hc_title(text = paste0(if (incid) "Incidência" else "Casos", " de ", nome_doenca(doenca), " por UF e ano, ", periodo_anos(anos))) |>
+    hc_title(text = paste0(if (incid) "Incidência" else "Casos", " de ", nome_doenca(doenca), " por UF e ano ", periodo_titulo(anos))) |>
     hc_subtitle(text = paste0(if (incid) "Casos por 100 mil habitantes" else "Casos notificados",
                               ", pela UF de residência. Faixas pelos quintis de todas as UFs e anos com casos: a mesma escala em todos os anos.",
                               if (length(prelim)) " * Dados preliminares." else "")) |>

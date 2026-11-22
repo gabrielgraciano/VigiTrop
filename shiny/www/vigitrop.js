@@ -76,6 +76,22 @@ VT.rotuloAbs = function () {
   return VT.num(k, k % 1 ? 1 : 0) + ' mil';
 };
 
+// Mapa de calor (Highcharts 9.3): depois que o gráfico muda de tamanho, o caminho
+// (shapeArgs.d) de cada célula continua com a geometria antiga. No hover, o
+// Highcharts redesenha a célula por esse caminho e ela "cai" sobre as vizinhas.
+// Refaz o caminho a partir da posição e do tamanho atuais, a cada desenho.
+VT.calorSemSalto = function () {
+  this.series.forEach(function (s) {
+    if (s.type !== 'heatmap') return;
+    s.points.forEach(function (p) {
+      var a = p.shapeArgs;
+      if (!a || a.d === undefined) return;
+      a.d = [['M', a.x, a.y], ['L', a.x + a.width, a.y], ['L', a.x + a.width, a.y + a.height],
+             ['L', a.x, a.y + a.height], ['Z']];
+    });
+  });
+};
+
 // Números no padrão brasileiro (para formatadores em JS).
 VT.num = function (x, casas) {
   return Highcharts.numberFormat(x, casas === undefined ? 0 : casas, ',', '.');
