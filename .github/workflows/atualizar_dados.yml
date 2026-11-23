@@ -6,7 +6,8 @@
 # pipeline (a CPU virtual dela não tem x86-64-v2, exigido pelo NumPy 2.4+):
 # ela só baixa a release mais recente (scripts/atualizar_da_release.sh).
 #
-# O gold só tem agregados (contagens por doença, ano, UF, sexo, faixa e raça).
+# O gold só tem agregados (contagens por doença, ano, UF, sexo, faixa e raça,
+# e por doença, ano e município de residência).
 name: Atualizar dados
 
 on:
@@ -62,6 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           for f in casos.parquet casos_mes.parquet casos_semana.parquet populacao.parquet \
+                   casos_municipio.parquet populacao_municipio.parquet municipios.parquet \
                    doencas.parquet arquivos.parquet tendencia.parquet meta.json; do
             test -s "data/gold/$f" || { echo "faltou data/gold/$f"; exit 1; }
           done

@@ -10,7 +10,7 @@ SINAN (catálogo S3 do PySUS) ─baixar─▶ data/cache + data/bronze/manifesto
                                         │
                                         └─silver─▶ data/silver/casos/<doenca>/<ano>.parquet
                                                     │
-IBGE (projeção revisão 2024) ─populacao─────────────┤
+IBGE (projeção 2024 + municípios) ─populacao───────┤
                                                     └─gold─▶ data/gold/  (o que o app lê)
                                                               │
                                                               ├─tendencia─▶ data/gold/tendencia.parquet
@@ -37,7 +37,7 @@ docker compose run --rm pipeline executar
 |---|---|---|
 | `listar` | Mostra os anos de cada doença e se cada um é FINAL ou PRELIM. Não baixa nada. Saída: `relatorios/catalogo.csv`. | sim |
 | `baixar` | Baixa os arquivos brutos para `cache/`, confere o sha256 e atualiza `bronze/manifesto.csv`. Tenta até 4 vezes. | sim |
-| `populacao` | Baixa a projeção do IBGE (uma vez só) e gera `gold/populacao.parquet`. | 1ª vez |
+| `populacao` | Baixa a projeção do IBGE (uma vez só) e gera `gold/populacao.parquet`. Baixa também a população dos municípios (API de agregados do IBGE; só os anos novos) e gera `gold/populacao_municipio.parquet` e `gold/municipios.parquet`. | sim |
 | `silver` | Bruto → um registro por notificação, num schema único. Incremental: só refaz o que mudou. | não |
 | `gold` | Silver → tabelas agregadas do app, mais os metadados. | não |
 | `tendencia` | Tendência da incidência Brasil por doença (joinpoint): `gold/tendencia.parquet`. Compara com o Joinpoint do TCC em `relatorios/tendencia_tcc.csv`. | não |
@@ -52,14 +52,17 @@ Opções:
 
 ## O gold (`data/gold/`)
 
-O app lê só estes arquivos, via DuckDB. Juntos ocupam menos de 2 MB.
+O app lê só estes arquivos, via DuckDB. Juntos ocupam cerca de 7 MB.
 
 | Arquivo | Colunas |
 |---|---|
 | `casos.parquet` | `doenca`, `definicao`, `ano`, `uf`, `sexo`, `faixa_etaria`, `raca`, `casos` |
 | `casos_mes.parquet` | `doenca`, `definicao`, `mes` (dia 1), `uf`, `sexo`, `faixa_etaria`, `casos`: mês da data de notificação. Os 12 meses somam o ano de `casos.parquet`. |
 | `casos_semana.parquet` | `doenca`, `definicao`, `semana` (AAAASS), `inicio_semana`, `uf`, `casos`: semana epidemiológica de início dos sintomas. Hanseníase e LTA ficam de fora porque não têm o campo. |
+| `casos_municipio.parquet` | `doenca`, `definicao`, `ano`, `uf`, `municipio`, `casos`: município de residência (código IBGE de 6 dígitos, como no SINAN). Sem as notificações com município ignorado (vazio ou `XX0000`); no DF, tudo em Brasília (`530010`), porque o SINAN às vezes traz a região administrativa (`5399xx`). |
 | `populacao.parquet` | `ano`, `uf`, `sexo`, `faixa_etaria`, `populacao` (2000-2070) |
+| `populacao_municipio.parquet` | `ano`, `uf`, `municipio`, `populacao`: ver [População dos municípios](#população-dos-municípios). |
+| `municipios.parquet` | `municipio` (6 dígitos), `codigo_ibge` (7), `nome`, `uf` |
 | `doencas.parquet` | `doenca`, `codigo`, `nome`, `definicao`, `expressao`, `padrao`, `filtro`, `notas`, `texto_app` |
 | `arquivos.parquet` | `doenca`, `codigo`, `ano`, `status` (FINAL/PRELIM), `data_coleta`, `linhas`, `aviso` |
 | `tendencia.parquet` | `doenca`, `definicao`, `tipo`, `segmento`, `ano_inicio`, `ano_fim`, `apc`, `apc_ic_inf`, `apc_ic_sup`, `significativo`, `taxa_inicio`, `taxa_fim`, `joinpoints`, `n_anos`, `aviso` |
@@ -72,6 +75,15 @@ Regras de leitura:
 - **`sexo`** vale `M`, `F` ou `I`. **`raca`** vai de `1` a `5`, e `9` é ignorada. **`faixa_etaria`** vai de `0-4` a `90 ou mais`, mais `Ignorado`.
 - **Definições:** uma notificação entra em todas as definições que satisfaz. O app filtra `definicao` e usa a marcada como `padrao` em `doencas.parquet`.
 - **`tendencia.parquet`** tem uma linha por segmento (`tipo = 'APC'`, `segmento` 1, 2...) e uma linha do período inteiro (`tipo = 'AAPC'`, `segmento` NULL) por doença. Só a definição padrão. `apc` e o IC estão em % ao ano. `taxa_inicio` e `taxa_fim` são a incidência ajustada pelo modelo (por 100 mil) nos anos-limite: servem para desenhar a linha de tendência. Ver [Tendência](#tendência).
+
+## População dos municípios
+
+A projeção do IBGE por UF não desce a município. A população de cada município vem da API de agregados do IBGE:
+- **Âncoras:** Contagem 2007 (tabela 793), Censos 2010 (202) e 2022 (4709) e as estimativas posteriores ao Censo 2022 (6579).
+- **Entre duas âncoras:** interpolação linear, município a município. As estimativas de 2011 a 2021 não entram: partiam do Censo 2010 e erraram a distribuição entre municípios (São Paulo capital cairia 3% de 2021 para 2022 só pela troca de fonte). Elas só servem para os 5 municípios instalados em 2013.
+- **Ajuste à projeção:** cada município fica com a sua fração da UF no ano, aplicada à projeção. A soma dos municípios dá a população da UF de `populacao.parquet`, então as taxas da aba "Municípios" conversam com as outras.
+
+A malha dos municípios do app (`shiny/mapas/municipios/<UF>.geojson`) vem da Malha Territorial 2025 do IBGE e é gerada uma vez por `scripts/gerar_mapas_municipios.py`.
 
 ## Definições de caso
 

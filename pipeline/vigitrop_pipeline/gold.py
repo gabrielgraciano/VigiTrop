@@ -14,7 +14,13 @@ data/gold/
   casos_semana.parquet  doenca, definicao, semana (AAAASS), inicio_semana (DATE), uf, casos
                      - semana epidemiológica de INÍCIO DOS SINTOMAS (SEM_PRI); sem
                        hanseníase e LTA (o campo não existe nessas fichas)
+  casos_municipio.parquet  doenca, definicao, ano, uf, municipio, casos
+                     - municipio = código IBGE de 6 dígitos do município de RESIDÊNCIA
+                       (ID_MN_RESI); sem as notificações com município ignorado
+                       (vazio ou XX0000); no DF, tudo em Brasília (530010)
+                     - sem sexo, idade e raça (a aba "Municípios" só mostra o total)
   populacao.parquet  gerado por populacao.py
+  populacao_municipio.parquet, municipios.parquet  gerados por municipios.py
   doencas.parquet    doenca, codigo, nome, definicao, expressao, padrao, filtro, notas, texto_app
   arquivos.parquet   doenca, codigo, ano, status (FINAL/PRELIM), data_coleta, linhas, aviso
   meta.json          data de geração, versões, fontes
@@ -115,6 +121,27 @@ def gerar(pastas: Pastas, cfg: Config) -> None:
         WHERE semana // 100 BETWEEN {cfg.ano_inicio} AND {ano_max} AND semana % 100 BETWEEN 1 AND 53
         GROUP BY ALL
         ORDER BY doenca, definicao, semana, uf""", g / "casos_semana.parquet")
+
+    # Casos por município de residência (aba "Municípios" do app). O DF é um
+    # município só (Brasília, 530010), mas o SINAN às vezes traz a região
+    # administrativa (5399xx); "XX0000" é município ignorado na UF.
+    municipio = ("CASE WHEN left(mun_res, 2) = '53' THEN '530010' "
+                 "WHEN right(mun_res, 4) = '0000' THEN NULL ELSE mun_res END AS municipio")
+    partes_mun = [p.replace("ano_notificacao AS ano, uf_res AS uf, sexo, faixa_etaria, raca",
+                            f"ano_notificacao AS ano, uf_res AS uf, {municipio}") for p in partes]
+    _copiar(con, f"""
+        SELECT doenca, definicao, ano, uf, municipio, CAST(count(*) AS INTEGER) AS casos
+        FROM ({' UNION ALL '.join(partes_mun)})
+        WHERE ano BETWEEN {cfg.ano_inicio} AND {ano_max} AND municipio IS NOT NULL
+        GROUP BY ALL
+        ORDER BY doenca, definicao, ano, uf, municipio""", g / "casos_municipio.parquet")
+    nomes_mun = g / "municipios.parquet"
+    if nomes_mun.exists():
+        fora = con.execute(f"""
+            SELECT count(DISTINCT municipio), coalesce(sum(casos), 0)
+            FROM read_parquet({literal(str(g / 'casos_municipio.parquet'))})
+            WHERE municipio NOT IN (SELECT municipio FROM read_parquet({literal(str(nomes_mun))}))""").fetchone()
+        log.info("Municípios do SINAN fora da lista do IBGE: %d códigos, %d casos (somando definições)", *fora)
 
     linhas_def = [
         (d.slug, d.codigo, d.nome, nome, expr, nome == d.padrao, d.filtro, d.notas, d.texto_app)
