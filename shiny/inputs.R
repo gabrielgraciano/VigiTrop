@@ -60,6 +60,20 @@ selecionar_ano_map <- seletor_ano("ano_map")
 tipo_mapa <- radioButtons("tipo_mapa", "Mostrar", choices = c("Incidência" = "incidencia", "Casos absolutos" = "casos"))
 botao_map <- botao("update_map")
 
+#Municípios----
+# Uma UF por vez, com os anos somados (um ano só deixa a taxa instável nos
+# municípios pequenos). O padrão são os 5 últimos anos com dados finais.
+selecionar_doenca_mun <- seletor_doenca("doenca_mun")
+selecionar_uf_mun <- pickerInput("uf_mun", "UF", choices = escolhas_uf, selected = "35",
+                                 options = pickerOptions(liveSearch = TRUE, liveSearchPlaceholder = "Buscar UF"))
+selecionar_periodo_mun <- sliderInput("periodo_mun", "Período", min = min(anos_disponiveis), max = max(anos_disponiveis),
+                                      value = c(ano_padrao - 4, ano_padrao), step = 1, sep = "")
+tipo_mun <- conditionalPanel(
+  condition = paste0("![", paste0("'", DOENCAS_SO_CASOS, "'", collapse = ","), "].includes(input.doenca_mun)"),
+  radioButtons("tipo_mun", "Mostrar", choices = c("Incidência" = "incidencia", "Casos absolutos" = "casos"))
+)
+botao_mun <- botao("update_mun")
+
 #UFs por ano----
 # Ids "_br" herdados da antiga animação (bar chart race).
 selecionar_doenca_br <- seletor_doenca("doenca_br")

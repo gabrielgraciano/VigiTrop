@@ -44,7 +44,8 @@ def _parser() -> argparse.ArgumentParser:
         "silver": "bruto -> data/silver/casos (um registro por notificação; incremental)",
     }
     sem_filtro = {
-        "populacao": "baixa a projeção do IBGE (revisão 2024) e gera data/gold/populacao.parquet",
+        "populacao": "baixa a projeção do IBGE (revisão 2024) e a população dos municípios: "
+                     "data/gold/populacao.parquet, populacao_municipio.parquet e municipios.parquet",
         "gold": "silver -> data/gold/casos.parquet + doencas, arquivos, meta",
         "tendencia": "tendência da incidência Brasil (joinpoint): data/gold/tendencia.parquet "
                      "+ comparação com o TCC (data/relatorios/tendencia_tcc.csv)",
@@ -100,6 +101,8 @@ def main(argv: list[str] | None = None) -> int:
         if c in ("populacao", "executar"):
             from . import populacao
             populacao.gerar(pastas, cfg.populacao_url, forcar)
+            from . import municipios
+            municipios.gerar(pastas, cfg.ano_inicio, forcar)
         if c in ("silver", "executar"):
             from . import silver
             silver.gerar(pastas, todas, doencas, anos, forcar)

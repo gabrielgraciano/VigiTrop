@@ -494,6 +494,110 @@ grafico_ranking <- function(m, doenca, ano, por = c("incidencia", "casos")) {
     exportacao(doenca, "ranking_ufs")
 }
 
+# ---- municípios -------------------------------------------------------------
+# Mesma leitura do mapa das UFs (quintis dos municípios com casos, ranking ao
+# lado), uma UF por vez. Com mais de um ano, a taxa é a média anual do período.
+
+#' "Incidência" ou, com vários anos, "Incidência média anual".
+nome_taxa_mun <- function(anos) if (length(anos) > 1) "Incidência média anual" else "Incidência"
+
+titulo_municipios <- function(m, doenca, uf, anos, por = c("incidencia", "casos")) {
+  por <- match.arg(por)
+  quantos <- if (nrow(m) > 1) paste0(" Casos em ", formatar_numero(sum(m$casos > 0)), " dos ",
+                                     formatar_numero(nrow(m)), " municípios.")
+  tagList(
+    tags$p(class = "vt-titulo", paste0(if (por == "incidencia") nome_taxa_mun(anos) else "Casos", " de ",
+                                       nome_doenca(doenca), " por município ", lugar_titulo(uf), " ", periodo_titulo(anos))),
+    tags$p(class = "vt-subtitulo", if (por == "incidencia") {
+      paste0("Casos por 100 mil habitantes", if (length(anos) > 1) " por ano", ". ", nome_uf(uf), ": ",
+             formatar_numero(attr(m, "taxa_uf"), casas_taxa(m$incidencia)), ".", quantos)
+    } else {
+      paste0("Pelo município de residência. ", nome_uf(uf), ": ", formatar_numero(attr(m, "casos_uf")), " casos.", quantos)
+    })
+  )
+}
+
+grafico_mapa_mun <- function(m, doenca, uf, anos, por = c("incidencia", "casos")) {
+  por <- match.arg(por)
+  v <- valor_mapa(m, por)
+  cl <- classes_mapa(v$valor, v$casas, m$casos)
+  casas_inc <- casas_taxa(m$incidencia)
+  rotulo <- paste0(
+    "<b>", htmltools::htmlEscape(m$nome), "</b><br/>",
+    formatar_numero(m$casos), ifelse(m$casos == 1, " caso", " casos"), "<br/>",
+    ifelse(is.na(m$incidencia), "sem população no período",
+           paste0(formatar_numero(m$incidencia, casas_inc), " por 100 mil hab.", if (length(anos) > 1) " por ano")),
+    "<br/>População: ", ifelse(is.na(m$populacao), "–", formatar_numero(m$populacao)),
+    if (length(anos) > 1) " (média)"
+  )
+  b <- sf::st_bbox(m)
+  leaflet(m, options = leafletOptions(zoomSnap = 0.25, attributionControl = FALSE)) |>
+    fitBounds(b[["xmin"]], b[["ymin"]], b[["xmax"]], b[["ymax"]]) |>
+    addPolygons(
+      fillColor = cl$cor, fillOpacity = 1, weight = 0.6, opacity = 1, color = "#FFFFFF",
+      highlightOptions = highlightOptions(weight = 2, color = CORES$tinta, bringToFront = TRUE),
+      label = lapply(rotulo, htmltools::HTML),
+      labelOptions = labelOptions(style = list("font-weight" = "normal", "font-family" = FONTE, padding = "4px 8px"),
+                                  textsize = "13px", direction = "auto")
+    ) |>
+    addLegend(colors = cl$cores, labels = cl$rotulos, opacity = 1, position = "bottomleft",
+              title = paste0(if (por == "incidencia") "por 100 mil hab." else "casos",
+                             "<br/><span style='font-weight:400'>(quintis dos municípios)</span>"))
+}
+
+#' Os `n` municípios com maior valor (só os com casos), com a taxa da UF tracejada.
+grafico_ranking_mun <- function(m, doenca, uf, anos, por = c("incidencia", "casos"), n = 20) {
+  por <- match.arg(por)
+  taxa_uf <- attr(m, "taxa_uf")
+  casos_uf <- attr(m, "casos_uf")
+  v <- valor_mapa(m, por)
+  m$cor <- classes_mapa(v$valor, v$casas, m$casos)$cor
+  m$valor <- v$valor
+  m <- sf::st_drop_geometry(m)
+  total_mun <- nrow(m)
+  casas_inc <- casas_taxa(m$incidencia)
+  acima <- sum(m$incidencia > taxa_uf, na.rm = TRUE)
+  m <- m[m$casos > 0 & !is.na(m$valor), ]
+  shiny::validate(shiny::need(nrow(m) > 0, "Nenhum caso no período."))
+  m <- utils::head(m[order(-m$valor, m$nome), ], n)
+  pontos <- list_parse(data.frame(y = m$valor, color = m$cor, rotulo = formatar_numero(m$valor, v$casas),
+                                  casos = paste(formatar_numero(m$casos), ifelse(m$casos == 1, "caso", "casos")),
+                                  incid = formatar_numero(m$incidencia, casas_inc), pop = formatar_numero(m$populacao)))
+  sigla <- ufs$SIGLA_UF[match(as.integer(uf), ufs$CD_UF)]
+  linhas <- list()
+  if (por == "incidencia") {
+    titulo <- if (total_mun > 1) paste0(formatar_numero(acima), " dos ", formatar_numero(total_mun),
+                                        " municípios ficaram acima da taxa da UF") else m$nome[1]
+    sub <- paste0(if (nrow(m) > 1) paste("Os", nrow(m), "com maior incidência, por") else "Por",
+                  " 100 mil habitantes", if (length(anos) > 1) " por ano", ". Linha tracejada: ", sigla, ".")
+    linhas <- list(list(value = taxa_uf, color = CORES$tinta, width = 1.5, dashStyle = "Dash", zIndex = 2,
+                        label = list(text = paste(sigla, formatar_numero(taxa_uf, casas_inc)), rotation = 0, align = "left",
+                                     verticalAlign = "bottom", x = 4, y = -4,
+                                     style = list(color = CORES$tinta, fontWeight = "600", fontSize = "13px"))))
+  } else {
+    pct <- 100 * m$casos[1] / casos_uf
+    titulo <- if (total_mun > 1) paste0(m$nome[1], " teve ", formatar_numero(pct, if (pct < 10) 1 else 0), "% dos casos da UF") else m$nome[1]
+    sub <- paste0(if (nrow(m) > 1) paste("Os", nrow(m), "com mais casos, pelo") else "Pelo", " município de residência.")
+  }
+  highchart() |>
+    hc_chart(type = "bar") |>
+    hc_add_series(data = pontos, name = if (por == "incidencia") "Incidência" else "Casos",
+                  dataLabels = list(enabled = TRUE, format = "{point.rotulo}", crop = FALSE, overflow = "allow",
+                                    zIndex = 6, style = list(fontSize = "12px", textOutline = "3px #FFFFFF"))) |>
+    hc_plotOptions(bar = list(pointPadding = 0.12, groupPadding = 0, borderWidth = 0)) |>
+    hc_xAxis(categories = m$nome, lineColor = CORES$tinta, tickLength = 0, labels = list(step = 1, style = list(fontSize = "12px"))) |>
+    hc_yAxis(min = 0, maxPadding = 0.22, gridLineWidth = 0, labels = list(enabled = FALSE), title = list(text = ""),
+             plotLines = linhas) |>
+    hc_title(text = titulo, style = list(fontSize = "16px")) |>
+    hc_subtitle(text = sub, style = list(fontSize = "13px")) |>
+    hc_legend(enabled = FALSE) |>
+    hc_tooltip(headerFormat = "<b>{point.key}</b><br/>",
+               pointFormat = paste0("{point.casos}<br/>{point.incid} por 100 mil hab.",
+                                    if (length(anos) > 1) " por ano", "<br/>População: {point.pop}")) |>
+    compacto(list(legend = list(enabled = FALSE)), largura = 380) |>
+    exportacao(doenca, "ranking_municipios")
+}
+
 # ---- UFs por ano (mapa de calor) --------------------------------------------
 
 #' Mapa de calor UF × ano: todas as UFs e todos os anos de uma vez, na mesma

@@ -20,6 +20,14 @@ ui <- page_navbar(
                   botao_map
                 ),
                 conditionalPanel(
+                  condition = "input.navset == 'Municípios'",
+                  selecionar_doenca_mun,
+                  selecionar_uf_mun,
+                  selecionar_periodo_mun,
+                  tipo_mun,
+                  botao_mun
+                ),
+                conditionalPanel(
                   condition = "input.navset == 'Sexo e raça/cor'",
                   selecionar_doenca_estatistica_descritiva,
                   selecionar_uf_ed,
@@ -60,6 +68,7 @@ ui <- page_navbar(
               navset_card_underline(
                 id = "navset",
                 nav_panel("Mapas", cards[[4]]),
+                nav_panel("Municípios", cards[[7]]),
                 nav_panel("Sexo e raça/cor", cards[[3]]),
                 nav_panel("Série temporal", cards[[1]]),
                 nav_panel("Série semanal", cards[[6]]),

@@ -102,4 +102,6 @@ body { font-variant-numeric: lining-nums; }
   /* Tendência: a tabela rola de lado; o APC sai do gráfico (está na tabela). */
   .vt-tabela { display: block; overflow-x: auto; min-width: 0; max-width: 100%; }
   .vt-rotulo-segmento { display: none; }
+  /* Municípios: uma UF só, quase sempre mais larga que alta, numa tela estreita */
+  #mapa_mun { height: 420px !important; }
 }

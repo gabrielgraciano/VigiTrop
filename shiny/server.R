@@ -144,6 +144,45 @@ server <- function(input, output, session) {
     ))
   })
 
+  #Municípios----
+  municipal <- eventReactive(input$update_mun, {
+    validate(need(tem_municipios, "Os dados por município ainda não chegaram: falta atualizar o gold."))
+    doenca <- validar(input$doenca_mun, escolhas_doenca)
+    uf <- validar(input$uf_mun, escolhas_uf)
+    periodo <- as.integer(validar(input$periodo_mun, anos_disponiveis))
+    anos <- intersect(seq(min(periodo), max(periodo)), anos_da_doenca(doenca))
+    validate(need(length(anos) > 0, "Não há dados dessa doença no período escolhido."))
+    por <- if (doenca %in% DOENCAS_SO_CASOS) "casos" else validar(input$tipo_mun, c("incidencia", "casos"))
+    list(doenca = doenca, uf = uf, anos = anos, por = por, dados = dados_municipios(doenca, uf, anos))
+  }, ignoreNULL = FALSE)
+
+  output$mun_titulo <- renderUI({
+    r <- municipal()
+    titulo_municipios(r$dados, r$doenca, r$uf, r$anos, r$por)
+  })
+  output$mapa_mun <- renderLeaflet({
+    r <- municipal()
+    grafico_mapa_mun(r$dados, r$doenca, r$uf, r$anos, r$por)
+  })
+  output$ranking_mun <- renderHighchart({
+    r <- municipal()
+    grafico_ranking_mun(r$dados, r$doenca, r$uf, r$anos, r$por)
+  })
+  output$nota_mun <- renderUI({
+    r <- municipal()
+    sem <- attr(r$dados, "sem_municipio")
+    nota_doenca(r$doenca, c(
+      if (r$doenca %in% DOENCAS_SO_CASOS) "Raiva: só casos, sem incidência (são poucos casos por ano no país todo)."
+      else if (r$por == "incidencia") paste(
+        "Com mais de um ano, a taxa é a média anual: casos do período ÷ soma das populações dos anos × 100 mil.",
+        "Em município pequeno, poucos casos mudam muito a taxa (1 caso em 5 mil habitantes já é 20 por 100 mil);",
+        "somar anos deixa a taxa mais estável."),
+      paste("Cores pelos quintis dos municípios com casos. Município de residência.",
+            "População dos municípios: Contagem 2007, Censos 2010 e 2022 e estimativas do IBGE, ajustadas à projeção da UF."),
+      if (sem > 0) paste(formatar_numero(sem), "caso(s) com município de residência ignorado não aparecem no mapa nem no ranking.")
+    ))
+  })
+
   #UFs por ano----
   # Mapa de calor UF × ano, no lugar da corrida de barras animada (e, antes
   # dela, do GIF de 600 quadros que o app antigo renderizava a cada clique).

@@ -59,6 +59,19 @@ arquivos <- ler_parquet("arquivos.parquet")
 arquivos$ano <- as.integer(arquivos$ano)
 meta <- jsonlite::fromJSON(file.path(dir_gold, "meta.json"))
 
+# Casos e população por município (aba "Municípios"); opcional: sem os
+# arquivos (gold de antes da aba), a aba avisa.
+tem_municipios <- all(file.exists(file.path(dir_gold, c("casos_municipio.parquet", "populacao_municipio.parquet"))))
+if (tem_municipios) {
+  casos_mun <- merge(ler_parquet("casos_municipio.parquet"), padroes[, c("doenca", "definicao")], by = c("doenca", "definicao"))
+  casos_mun$definicao <- NULL
+  casos_mun$uf <- as.integer(casos_mun$uf)
+  casos_mun$ano <- as.integer(casos_mun$ano)
+  pop_mun <- ler_parquet("populacao_municipio.parquet")
+  pop_mun$uf <- as.integer(pop_mun$uf)
+  pop_mun$ano <- as.integer(pop_mun$ano)
+}
+
 ufs_sf <- sf::st_read(file.path("mapas", "uf_2022.geojson"), quiet = TRUE)
 ufs_sf$CD_UF <- as.integer(ufs_sf$CD_UF)
 ufs <- sf::st_drop_geometry(ufs_sf)
@@ -71,6 +84,9 @@ escolhas_doenca <- escolhas_doenca[order(names(escolhas_doenca))]
 escolhas_doenca_semana <- escolhas_doenca[escolhas_doenca %in% unique(casos_semana$doenca)]
 escolhas_uf <- stats::setNames(as.character(ufs$CD_UF), ufs$NM_UF)
 escolhas_uf_brasil <- c("Brasil" = BRASIL, escolhas_uf)
+# Raiva: tão poucos casos que a incidência por município não diz nada; a aba
+# "Municípios" mostra só os casos.
+DOENCAS_SO_CASOS <- intersect("raiva_humana", escolhas_doenca)
 anos_disponiveis <- sort(unique(arquivos$ano))
 ano_padrao <- max(arquivos$ano[arquivos$status == "FINAL"])
 
@@ -203,6 +219,44 @@ dados_uf_ano <- function(doenca, tipo) {
   grade$sigla <- ufs$SIGLA_UF[match(grade$uf, ufs$CD_UF)]
   grade$regiao <- c("1" = "Norte", "2" = "Nordeste", "3" = "Sudeste", "4" = "Sul", "5" = "Centro-Oeste")[as.character(grade$uf %/% 10)]
   grade
+}
+
+# Malha dos municípios de cada UF (mapas/municipios/<UF>.geojson), lida na
+# primeira vez que a UF é escolhida e guardada.
+malhas_municipios <- new.env()
+malha_municipios <- function(uf) {
+  sigla <- ufs$SIGLA_UF[match(as.integer(uf), ufs$CD_UF)]
+  if (is.null(malhas_municipios[[sigla]])) {
+    m <- sf::st_read(file.path("mapas", "municipios", paste0(sigla, ".geojson")), quiet = TRUE)
+    m$municipio <- as.character(m$municipio)
+    malhas_municipios[[sigla]] <- m
+  }
+  malhas_municipios[[sigla]]
+}
+
+#' Casos e incidência por município de uma UF, somando os anos `anos`. A
+#' incidência do período é a média anual: casos / soma das populações dos anos
+#' (pessoas-ano) × 100 mil. Casos sem município identificado ficam fora do
+#' mapa; a quantidade volta em attr(, "sem_municipio"), e a taxa da UF no
+#' período, em attr(, "taxa_uf").
+dados_municipios <- function(doenca, uf, anos) {
+  uf <- as.integer(uf)
+  m <- malha_municipios(uf)
+  sel <- casos_mun[casos_mun$doenca == doenca & casos_mun$uf == uf & casos_mun$ano %in% anos, ]
+  n <- tapply(sel$casos, sel$municipio, sum)
+  p <- pop_mun[pop_mun$uf == uf & pop_mun$ano %in% anos, ]
+  pessoas_ano <- tapply(p$populacao, p$municipio, sum)
+  anos_pop <- tapply(p$ano, p$municipio, length)
+  m$casos <- as.numeric(n[m$municipio])
+  m$casos[is.na(m$casos)] <- 0
+  m$populacao <- as.numeric(pessoas_ano[m$municipio] / anos_pop[m$municipio])
+  m$incidencia <- m$casos / as.numeric(pessoas_ano[m$municipio]) * 1e5
+  total <- sum(casos$casos[casos$doenca == doenca & !is.na(casos$uf) & casos$uf == uf & casos$ano %in% anos])
+  pop_uf <- sum(populacao$populacao[populacao$uf == uf & populacao$ano %in% anos])
+  attr(m, "sem_municipio") <- total - sum(m$casos)
+  attr(m, "casos_uf") <- total
+  attr(m, "taxa_uf") <- total / pop_uf * 1e5
+  m
 }
 
 #' Segmentos (APC) e período (AAPC) da tendência de uma doença; NULL se não houver.
