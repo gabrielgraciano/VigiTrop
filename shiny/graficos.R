@@ -501,7 +501,39 @@ grafico_ranking <- function(m, doenca, ano, por = c("incidencia", "casos")) {
 #' "Incidência" ou, com vários anos, "Incidência média anual".
 nome_taxa_mun <- function(anos) if (length(anos) > 1) "Incidência média anual" else "Incidência"
 
-titulo_municipios <- function(m, doenca, uf, anos, por = c("incidencia", "casos")) {
+#' Números do município buscado e a posição dele entre os municípios da UF
+#' (1º = maior valor; empates ficam com a mesma posição). NULL sem busca.
+destaque_mun <- function(m, por, codigo) {
+  if (is.null(codigo)) return(NULL)
+  i <- match(codigo, m$municipio)
+  if (is.na(i)) return(NULL)
+  v <- valor_mapa(m, por)$valor
+  ok <- is.finite(v)
+  list(i = i, codigo = codigo, nome = m$nome[i], casos = m$casos[i], incidencia = m$incidencia[i],
+       populacao = m$populacao[i], valor = v[i],
+       posicao = if (is.finite(v[i])) sum(v[ok] > v[i]) + 1 else NA, total = sum(ok))
+}
+
+#' Quadro do município buscado, logo abaixo do título do mapa.
+quadro_municipio <- function(dm, m, anos, por) {
+  if (is.null(dm)) return(NULL)
+  varios <- length(anos) > 1
+  texto <- if (dm$casos == 0) {
+    paste0(": nenhum caso ", periodo_titulo(anos), ".")
+  } else {
+    paste0(
+      ": ", formatar_numero(dm$casos), if (dm$casos == 1) " caso" else " casos",
+      if (!is.na(dm$incidencia)) paste0(", ", formatar_numero(dm$incidencia, casas_taxa(m$incidencia)),
+                                         " por 100 mil hab.", if (varios) " por ano"),
+      ". ", dm$posicao, "º ", if (por == "incidencia") "em incidência" else "em casos",
+      " entre os ", formatar_numero(dm$total), " municípios da UF.",
+      if (!is.na(dm$populacao)) paste0(" População: ", formatar_numero(dm$populacao), if (varios) " (média)", ".")
+    )
+  }
+  tags$p(class = "vt-destaque-mun", tags$b(dm$nome, .noWS = "after"), texto)
+}
+
+titulo_municipios <- function(m, doenca, uf, anos, por = c("incidencia", "casos"), municipio = NULL) {
   por <- match.arg(por)
   quantos <- if (nrow(m) > 1) paste0(" Casos em ", formatar_numero(sum(m$casos > 0)), " dos ",
                                      formatar_numero(nrow(m)), " municípios.")
@@ -513,11 +545,12 @@ titulo_municipios <- function(m, doenca, uf, anos, por = c("incidencia", "casos"
              formatar_numero(attr(m, "taxa_uf"), casas_taxa(m$incidencia)), ".", quantos)
     } else {
       paste0("Pelo município de residência. ", nome_uf(uf), ": ", formatar_numero(attr(m, "casos_uf")), " casos.", quantos)
-    })
+    }),
+    quadro_municipio(destaque_mun(m, por, municipio), m, anos, por)
   )
 }
 
-grafico_mapa_mun <- function(m, doenca, uf, anos, por = c("incidencia", "casos")) {
+grafico_mapa_mun <- function(m, doenca, uf, anos, por = c("incidencia", "casos"), municipio = NULL) {
   por <- match.arg(por)
   v <- valor_mapa(m, por)
   cl <- classes_mapa(v$valor, v$casas, m$casos)
@@ -530,9 +563,12 @@ grafico_mapa_mun <- function(m, doenca, uf, anos, por = c("incidencia", "casos")
     "<br/>População: ", ifelse(is.na(m$populacao), "–", formatar_numero(m$populacao)),
     if (length(anos) > 1) " (média)"
   )
-  b <- sf::st_bbox(m)
-  leaflet(m, options = leafletOptions(zoomSnap = 0.25, attributionControl = FALSE)) |>
-    fitBounds(b[["xmin"]], b[["ymin"]], b[["xmax"]], b[["ymax"]]) |>
+  dm <- destaque_mun(m, por, municipio)
+  # Com um município buscado, o zoom vai nele, com folga para ver os vizinhos
+  b <- sf::st_bbox(if (is.null(dm)) m else m[dm$i, ])
+  folga <- if (is.null(dm)) 0 else 1.5 * max(b[["xmax"]] - b[["xmin"]], b[["ymax"]] - b[["ymin"]], 0.15)
+  mapa <- leaflet(m, options = leafletOptions(zoomSnap = 0.25, attributionControl = FALSE)) |>
+    fitBounds(b[["xmin"]] - folga, b[["ymin"]] - folga, b[["xmax"]] + folga, b[["ymax"]] + folga) |>
     addPolygons(
       fillColor = cl$cor, fillOpacity = 1, weight = 0.6, opacity = 1, color = "#FFFFFF",
       highlightOptions = highlightOptions(weight = 2, color = CORES$tinta, bringToFront = TRUE),
@@ -543,11 +579,18 @@ grafico_mapa_mun <- function(m, doenca, uf, anos, por = c("incidencia", "casos")
     addLegend(colors = cl$cores, labels = cl$rotulos, opacity = 1, position = "bottomleft",
               title = paste0(if (por == "incidencia") "por 100 mil hab." else "casos",
                              "<br/><span style='font-weight:400'>(quintis dos municípios)</span>"))
+  if (is.null(dm)) return(mapa)
+  # Contorno do município buscado, com o nome sempre à vista
+  addPolygons(mapa, data = m[dm$i, ], fill = FALSE, weight = 3.5, color = CORES$secundaria, opacity = 1,
+              label = dm$nome, labelOptions = labelOptions(
+                permanent = TRUE, direction = "top", textsize = "13px",
+                style = list("font-weight" = "600", "font-family" = FONTE, color = CORES$secundaria, padding = "2px 6px")))
 }
 
 #' Os `n` municípios com maior valor (só os com casos), com a taxa da UF tracejada.
-grafico_ranking_mun <- function(m, doenca, uf, anos, por = c("incidencia", "casos"), n = 20) {
+grafico_ranking_mun <- function(m, doenca, uf, anos, por = c("incidencia", "casos"), municipio = NULL, n = 20) {
   por <- match.arg(por)
+  dm <- destaque_mun(m, por, municipio)
   taxa_uf <- attr(m, "taxa_uf")
   casos_uf <- attr(m, "casos_uf")
   v <- valor_mapa(m, por)
@@ -559,25 +602,38 @@ grafico_ranking_mun <- function(m, doenca, uf, anos, por = c("incidencia", "caso
   acima <- sum(m$incidencia > taxa_uf, na.rm = TRUE)
   m <- m[m$casos > 0 & !is.na(m$valor), ]
   shiny::validate(shiny::need(nrow(m) > 0, "Nenhum caso no período."))
-  m <- utils::head(m[order(-m$valor, m$nome), ], n)
+  ordem <- m[order(-m$valor, m$nome), ]
+  m <- utils::head(ordem, n)
+  # Município buscado: fora dos 20, entra no fim, com a posição; dentro, só ganha destaque
+  fora <- !is.null(dm) && !(dm$codigo %in% m$municipio) && dm$codigo %in% ordem$municipio
+  n_top <- nrow(m)
+  if (fora) m <- rbind(m, ordem[ordem$municipio == dm$codigo, ])
+  buscado <- !is.null(dm) & m$municipio %in% dm$codigo
+  nomes <- ifelse(buscado, paste0('<span style="color:', CORES$secundaria, ';font-weight:600">',
+                                  if (fora) paste0(dm$posicao, "º · ") else "", htmltools::htmlEscape(m$nome), "</span>"),
+                  htmltools::htmlEscape(m$nome))
   pontos <- list_parse(data.frame(y = m$valor, color = m$cor, rotulo = formatar_numero(m$valor, v$casas),
                                   casos = paste(formatar_numero(m$casos), ifelse(m$casos == 1, "caso", "casos")),
-                                  incid = formatar_numero(m$incidencia, casas_inc), pop = formatar_numero(m$populacao)))
+                                  incid = formatar_numero(m$incidencia, casas_inc), pop = formatar_numero(m$populacao),
+                                  borderColor = ifelse(buscado, CORES$secundaria, "#FFFFFF"),
+                                  borderWidth = ifelse(buscado, 2.5, 0)))
   sigla <- ufs$SIGLA_UF[match(as.integer(uf), ufs$CD_UF)]
   linhas <- list()
   if (por == "incidencia") {
     titulo <- if (total_mun > 1) paste0(formatar_numero(acima), " dos ", formatar_numero(total_mun),
                                         " municípios ficaram acima da taxa da UF") else m$nome[1]
-    sub <- paste0(if (nrow(m) > 1) paste("Os", nrow(m), "com maior incidência, por") else "Por",
-                  " 100 mil habitantes", if (length(anos) > 1) " por ano", ". Linha tracejada: ", sigla, ".")
+    sub <- paste0(if (n_top > 1) paste("Os", n_top, "com maior incidência, por") else "Por",
+                  " 100 mil habitantes", if (length(anos) > 1) " por ano", ". Linha tracejada: ", sigla,
+                  if (fora) paste0(" (", formatar_numero(taxa_uf, casas_inc), ")"), ".")
     linhas <- list(list(value = taxa_uf, color = CORES$tinta, width = 1.5, dashStyle = "Dash", zIndex = 2,
-                        label = list(text = paste(sigla, formatar_numero(taxa_uf, casas_inc)), rotation = 0, align = "left",
+                        # com o município buscado no fim, o rótulo da linha cairia em cima da barra dele
+                        label = list(text = if (fora) "" else paste(sigla, formatar_numero(taxa_uf, casas_inc)), rotation = 0, align = "left",
                                      verticalAlign = "bottom", x = 4, y = -4,
                                      style = list(color = CORES$tinta, fontWeight = "600", fontSize = "13px"))))
   } else {
     pct <- 100 * m$casos[1] / casos_uf
     titulo <- if (total_mun > 1) paste0(m$nome[1], " teve ", formatar_numero(pct, if (pct < 10) 1 else 0), "% dos casos da UF") else m$nome[1]
-    sub <- paste0(if (nrow(m) > 1) paste("Os", nrow(m), "com mais casos, pelo") else "Pelo", " município de residência.")
+    sub <- paste0(if (n_top > 1) paste("Os", n_top, "com mais casos, pelo") else "Pelo", " município de residência.")
   }
   highchart() |>
     hc_chart(type = "bar") |>
@@ -585,11 +641,11 @@ grafico_ranking_mun <- function(m, doenca, uf, anos, por = c("incidencia", "caso
                   dataLabels = list(enabled = TRUE, format = "{point.rotulo}", crop = FALSE, overflow = "allow",
                                     zIndex = 6, style = list(fontSize = "12px", textOutline = "3px #FFFFFF"))) |>
     hc_plotOptions(bar = list(pointPadding = 0.12, groupPadding = 0, borderWidth = 0)) |>
-    hc_xAxis(categories = m$nome, lineColor = CORES$tinta, tickLength = 0, labels = list(step = 1, style = list(fontSize = "12px"))) |>
+    hc_xAxis(categories = nomes, lineColor = CORES$tinta, tickLength = 0, labels = list(step = 1, style = list(fontSize = "12px"))) |>
     hc_yAxis(min = 0, maxPadding = 0.22, gridLineWidth = 0, labels = list(enabled = FALSE), title = list(text = ""),
              plotLines = linhas) |>
     hc_title(text = titulo, style = list(fontSize = "16px")) |>
-    hc_subtitle(text = sub, style = list(fontSize = "13px")) |>
+    hc_subtitle(text = paste0(sub, if (fora) " No fim, o município buscado e a posição dele."), style = list(fontSize = "13px")) |>
     hc_legend(enabled = FALSE) |>
     hc_tooltip(headerFormat = "<b>{point.key}</b><br/>",
                pointFormat = paste0("{point.casos}<br/>{point.incid} por 100 mil hab.",
