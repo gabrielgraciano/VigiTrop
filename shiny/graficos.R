@@ -319,16 +319,22 @@ paineis_raca <- function(d, doenca, uf) {
 
 # ---- pirâmide etária -----------------------------------------------------
 
-grafico_piramide <- function(d, doenca, uf, ano) {
+#' Pirâmide de casos ou de incidência (casos por 100 mil habitantes da mesma
+#' faixa e sexo: a taxa específica, que tira o efeito do tamanho de cada faixa).
+grafico_piramide <- function(d, doenca, uf, ano, por = c("casos", "incidencia")) {
+  por <- match.arg(por)
+  inc <- por == "incidencia"
   total <- sum(d$casos)
   pct_f <- 100 * sum(d$casos[d$sexo == "F"]) / total
+  casas <- casas_taxa(d$incidencia)
+  v <- if (inc) d$incidencia else d$casos
   serie <- function(s, sinal) {
     x <- d[d$sexo == s, ]
     x <- x[match(FAIXAS, x$faixa_etaria), ]
-    list_parse(data.frame(y = sinal * x$casos, casos = formatar_numero(x$casos),
-                          pct = formatar_numero(100 * x$casos / total, 1)))
+    list_parse(data.frame(y = sinal * (if (inc) x$incidencia else x$casos), casos = formatar_numero(x$casos),
+                          pct = formatar_numero(100 * x$casos / total, 1), inc = formatar_numero(x$incidencia, casas)))
   }
-  m <- max(d$casos)
+  m <- max(v, na.rm = TRUE)
   marcas <- pretty(c(0, m), n = 3)
   marcas <- marcas[marcas <= m * 1.08]
   marcas <- c(-rev(marcas[-1]), marcas)
@@ -345,12 +351,16 @@ grafico_piramide <- function(d, doenca, uf, ano) {
     hc_yAxis(min = -m * 1.08, max = m * 1.08, tickPositions = marcas, endOnTick = FALSE, startOnTick = FALSE,
              title = list(text = ""), plotLines = linha_base(),
              labels = list(formatter = JS("VT.rotuloAbs"))) |>
-    hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por faixa etária e sexo ", lugar_titulo(uf), " em ", ano)) |>
-    hc_subtitle(text = paste0(formatar_numero(total), " casos com sexo e idade conhecidos; ",
+    hc_title(text = paste0(if (inc) "Incidência" else "Casos", " de ", nome_doenca(doenca), " por faixa etária e sexo ",
+                           lugar_titulo(uf), " em ", ano)) |>
+    hc_subtitle(text = paste0(if (inc) "Casos por 100 mil habitantes da mesma faixa etária e sexo. ",
+                              formatar_numero(total), " casos com sexo e idade conhecidos; ",
                               formatar_numero(pct_f, 0), "% no sexo feminino.")) |>
     hc_legend(enabled = FALSE) |>
-    hc_tooltip(headerFormat = "", pointFormat = "<b>{series.name}, {point.category} anos</b><br/>{point.casos} casos ({point.pct}% do total)") |>
-    compacto(list(legend = list(enabled = FALSE), yAxis = list(tickPositions = poucas))) |>
+    hc_tooltip(headerFormat = "", pointFormat = paste0("<b>{series.name}, {point.category} anos</b><br/>",
+                                                       if (inc) "{point.inc} por 100 mil hab.<br/>{point.casos} casos"
+                                                       else "{point.casos} casos ({point.pct}% do total)<br/>{point.inc} por 100 mil hab.")) |>
+    compacto(list(yAxis = list(tickPositions = poucas))) |>
     exportacao(doenca, "piramide")
 }
 

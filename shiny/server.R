@@ -83,18 +83,23 @@ server <- function(input, output, session) {
     doenca <- validar(input$doenca_pe, escolhas_doenca)
     uf <- validar(input$uf_pe, escolhas_uf_brasil)
     ano <- as.integer(validar(input$ano_pe, as.character(anos_disponiveis)))
-    list(doenca = doenca, uf = uf, ano = ano, dados = dados_piramide(doenca, uf, ano))
+    por <- validar(input$tipo_pe, c("casos", "incidencia"))
+    list(doenca = doenca, uf = uf, ano = ano, por = por, dados = dados_piramide(doenca, uf, ano))
   }, ignoreNULL = FALSE)
 
   output$piram_et <- renderHighchart({
     r <- piramide()
     validate(need(sum(r$dados$casos) > 0, "Não há casos para esse conjunto de filtros."))
-    grafico_piramide(r$dados, r$doenca, r$uf, r$ano)
+    grafico_piramide(r$dados, r$doenca, r$uf, r$ano, r$por)
   })
   output$nota_pe <- renderUI({
     r <- piramide()
     sem <- attr(r$dados, "sem_idade")
-    nota_doenca(r$doenca, if (sem > 0) paste(formatar_numero(sem), "caso(s) com idade ignorada não aparecem na pirâmide."))
+    nota_doenca(r$doenca, c(
+      if (r$por == "incidencia") paste(
+        "Incidência: casos da faixa etária e do sexo ÷ população da mesma faixa e sexo (projeção do IBGE) × 100 mil.",
+        "Em faixas com poucos casos ou pouca gente (90 ou mais, por exemplo), a taxa oscila muito de um ano para outro."),
+      if (sem > 0) paste(formatar_numero(sem), "caso(s) com idade ignorada não aparecem na pirâmide.")))
   })
 
   #Sexo e raça/cor----
