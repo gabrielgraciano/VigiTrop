@@ -42,15 +42,11 @@ ui <- page_navbar(
                   selecionar_uf_st,
                   selecionar_sexo,
                   selecionar_idade,
+                  selecionar_raca_st,
                   selecionar_periodicidade_st,
+                  selecionar_periodo_st,
+                  selecionar_metrica_st,
                   botao_st
-                ),
-                conditionalPanel(
-                  condition = "input.navset == 'Série semanal'",
-                  selecionar_doenca_sem,
-                  selecionar_uf_sem,
-                  selecionar_periodo_sem,
-                  botao_sem
                 ),
                 conditionalPanel(
                   condition = "input.navset == 'Pirâmide Etária'",
@@ -72,7 +68,6 @@ ui <- page_navbar(
                 nav_panel("Municípios", cards[[7]]),
                 nav_panel("Sexo e raça/cor", cards[[3]]),
                 nav_panel("Série temporal", cards[[1]]),
-                nav_panel("Série semanal", cards[[6]]),
                 nav_panel("Pirâmide Etária", cards[[2]]),
                 nav_panel("UFs por ano", cards[[5]])
               )

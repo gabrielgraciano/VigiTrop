@@ -154,78 +154,70 @@ sem_rotulo <- function(bandas) lapply(bandas, function(b) { b$label <- NULL; b }
 
 # ---- série temporal ----------------------------------------------------------
 
-#' Incidência anual ou mensal de uma ou mais séries (UF × sexo).
-grafico_serie <- function(dados, doenca, mensal, detalhe = NULL) {
+#' Série anual, mensal ou semanal de uma ou mais linhas (UF × sexo), em
+#' incidência (por 100 mil) ou em casos. `dados` vem de dados_serie(), com a
+#' coluna `serie` (nome da linha).
+grafico_serie <- function(dados, doenca, periodicidade, metrica, detalhe = NULL) {
   nomes <- unique(dados$serie)
-  casas <- casas_taxa(dados$incidencia)
+  inc <- metrica == "incidencia"
+  casas <- if (inc) casas_taxa(dados$incidencia) else 0
   um <- length(nomes) == 1
+  semanal <- periodicidade == "semanal"
+  datas <- periodicidade != "anual"
+  x_de <- function(d) switch(periodicidade, anual = d$t, mensal = datetime_to_timestamp(d$t),
+                             semanal = datetime_to_timestamp(d$inicio_semana))
+  pico <- function(d, k) switch(periodicidade, anual = paste("Pico em", d$t[k]), mensal = paste("Pico em", mes_ano(d$t[k])),
+                                semanal = paste("Pico na semana de", format(d$inicio_semana[k], "%d/%m/%Y")))
   hc <- highchart() |>
     hc_chart(type = "line", marginRight = margem_rotulos(nomes), events = list(render = JS("VT.rotulosFinais")))
   for (i in seq_along(nomes)) {
     d <- dados[dados$serie == nomes[i], ]
-    x <- if (mensal) datetime_to_timestamp(d$mes) else d$ano
-    pontos <- list_parse(data.frame(x = x, y = d$incidencia, casos = formatar_numero(d$casos)))
-    if (um) {
-      quando <- if (mensal) mes_ano(d$mes[which.max(d$incidencia)]) else d$ano[which.max(d$incidencia)]
-      pontos <- marcar_pico(pontos, paste("Pico em", quando), formatar_numero(max(d$incidencia), casas))
+    v <- if (inc) d$incidencia else d$casos
+    pontos <- list_parse(data.frame(x = x_de(d), y = v, casos = formatar_numero(d$casos)))
+    if (um && any(v > 0, na.rm = TRUE)) {
+      k <- which.max(v)
+      pontos <- marcar_pico(pontos, pico(d, k), if (inc) formatar_numero(v[k], casas) else paste(formatar_numero(v[k]), "casos"))
     }
     hc <- hc |> hc_add_series(data = pontos, name = nomes[i], color = PALETA[(i - 1) %% length(PALETA) + 1],
-                              lineWidth = if (um) 3 else 2.5)
+                              lineWidth = if (semanal) (if (um) 2.5 else 2) else (if (um) 3 else 2.5))
   }
-  sub <- paste0(if (mensal) "Casos notificados no mês por 100 mil habitantes" else "Casos por 100 mil habitantes, por ano de notificação",
-                if (length(detalhe)) paste0(". ", detalhe) else "")
-  bandas <- if (mensal) faixa_preliminar(doenca, datas = TRUE) else faixa_preliminar(doenca)
-  eixo_x <- if (mensal) {
-    list(type = "datetime", plotBands = bandas, dateTimeLabelFormats = list(month = "%b/%Y", year = "%Y"))
+  periodo <- switch(periodicidade, anual = periodo_titulo(dados$t),
+                    mensal = paste0("de ", mes_ano(min(dados$t)), " a ", mes_ano(max(dados$t))),
+                    semanal = periodo_titulo(dados$t %/% 100))
+  titulo <- if (inc) {
+    paste0(switch(periodicidade, anual = "Incidência", mensal = "Incidência mensal", semanal = "Incidência semanal"),
+           " de ", nome_doenca(doenca), " ", periodo)
+  } else {
+    paste0("Casos de ", nome_doenca(doenca), switch(periodicidade, anual = " por ano ", mensal = " por mês ",
+                                                    semanal = " por semana epidemiológica "), periodo)
+  }
+  sub <- switch(periodicidade,
+                anual = if (inc) "Casos por 100 mil habitantes, por ano de notificação" else "Casos por ano de notificação",
+                mensal = if (inc) "Casos notificados no mês por 100 mil habitantes" else "Casos por mês de notificação",
+                semanal = paste0("Casos por semana de início dos sintomas", if (inc) ", por 100 mil habitantes",
+                                 ". As semanas mais recentes ainda estão incompletas"))
+  sub <- paste0(sub, if (length(detalhe)) paste0(". ", detalhe) else "", ".")
+  bandas <- faixa_preliminar(doenca, datas = datas)
+  eixo_x <- if (datas) {
+    list(type = "datetime", plotBands = bandas, dateTimeLabelFormats = list(week = "%d/%m/%Y", month = "%b/%Y", year = "%Y"))
   } else {
     list(allowDecimals = FALSE, plotBands = bandas)
   }
   hc |>
-    hc_title(text = paste0("Incidência ", if (mensal) "mensal " else "", "de ", nome_doenca(doenca), " ",
-                           if (mensal) paste0("de ", mes_ano(min(dados$mes)), " a ", mes_ano(max(dados$mes)))
-                           else periodo_titulo(dados$ano))) |>
+    hc_title(text = titulo) |>
     hc_subtitle(text = sub) |>
     hc_xAxis(eixo_x) |>
-    hc_yAxis(min = 0, title = list(text = "por 100 mil hab."), plotLines = linha_base()) |>
+    hc_yAxis(min = 0, title = list(text = if (inc) "por 100 mil hab." else switch(periodicidade, anual = "casos por ano",
+                                                                                   mensal = "casos por mês", semanal = "casos por semana")),
+             plotLines = linha_base()) |>
     hc_legend(enabled = FALSE) |>
-    hc_tooltip(shared = TRUE, crosshairs = TRUE, xDateFormat = "%b/%Y", headerFormat = "<b>{point.key}</b><br/>",
-               pointFormat = paste0('<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.',
-                                    casas, 'f}</b> ({point.casos} casos)<br/>')) |>
-    compacto(list(xAxis = c(list(plotBands = sem_rotulo(bandas)), if (!mensal) list(tickInterval = 5)))) |>
-    exportacao(doenca, "serie")
-}
-
-# ---- série semanal -------------------------------------------------------
-
-grafico_semanal <- function(dados, doenca) {
-  nomes <- unique(dados$uf)
-  um <- length(nomes) == 1
-  hc <- highchart() |>
-    hc_chart(type = "line", marginRight = margem_rotulos(nomes), events = list(render = JS("VT.rotulosFinais")))
-  for (i in seq_along(nomes)) {
-    d <- dados[dados$uf == nomes[i], ]
-    pontos <- list_parse(data.frame(x = datetime_to_timestamp(d$inicio_semana), y = d$casos))
-    if (um) {
-      pontos <- marcar_pico(pontos, paste("Pico na semana de", format(d$inicio_semana[which.max(d$casos)], "%d/%m/%Y")),
-                            paste(formatar_numero(max(d$casos)), "casos"))
-    }
-    hc <- hc |> hc_add_series(data = pontos, name = nomes[i], color = PALETA[(i - 1) %% length(PALETA) + 1],
-                              lineWidth = if (um) 2.5 else 2)
-  }
-  anos <- as.integer(format(range(dados$inicio_semana), "%Y"))
-  bandas <- faixa_preliminar(doenca, datas = TRUE)
-  hc |>
-    hc_title(text = paste0("Casos de ", nome_doenca(doenca), " por semana epidemiológica ", periodo_titulo(anos))) |>
-    hc_subtitle(text = "Casos por semana de início dos sintomas. As semanas mais recentes ainda estão incompletas.") |>
-    hc_xAxis(type = "datetime", plotBands = bandas,
-             dateTimeLabelFormats = list(week = "%d/%m/%Y", month = "%b/%Y", year = "%Y")) |>
-    hc_yAxis(min = 0, title = list(text = "casos por semana"), plotLines = linha_base()) |>
-    hc_legend(enabled = FALSE) |>
-    hc_tooltip(shared = TRUE, crosshairs = TRUE, xDateFormat = "Semana de %d/%m/%Y",
-               headerFormat = "<b>{point.key}</b><br/>",
-               pointFormat = '<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.0f}</b> casos<br/>') |>
-    compacto(list(xAxis = list(plotBands = sem_rotulo(bandas)))) |>
-    exportacao(doenca, "semanal")
+    hc_tooltip(shared = TRUE, crosshairs = TRUE,
+               xDateFormat = if (semanal) "Semana de %d/%m/%Y" else "%b/%Y", headerFormat = "<b>{point.key}</b><br/>",
+               pointFormat = if (inc) paste0('<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.',
+                                             casas, 'f}</b> ({point.casos} casos)<br/>')
+                             else '<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:,.0f}</b> casos<br/>') |>
+    compacto(list(xAxis = c(list(plotBands = sem_rotulo(bandas)), if (!datas) list(tickInterval = 5)))) |>
+    exportacao(doenca, paste0("serie_", periodicidade))
 }
 
 # ---- distribuição por sexo e por raça/cor --------------------------------

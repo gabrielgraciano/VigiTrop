@@ -8,10 +8,10 @@ data/gold/
                      - sem linhas agregadas ("Brasil", "Todos"): o total é sempre a soma
                      - uma linha conta em todas as definições que satisfaz; o app filtra
                        `definicao` (padrão em doencas.parquet)
-  casos_mes.parquet  doenca, definicao, mes (DATE, dia 1), uf, sexo, faixa_etaria, casos
+  casos_mes.parquet  doenca, definicao, mes (DATE, dia 1), uf, sexo, faixa_etaria, raca, casos
                      - mês da data de NOTIFICAÇÃO (DT_NOTIFIC): os 12 meses somam o ano
                        de casos.parquet
-  casos_semana.parquet  doenca, definicao, semana (AAAASS), inicio_semana (DATE), uf, casos
+  casos_semana.parquet  doenca, definicao, semana (AAAASS), inicio_semana (DATE), uf, sexo, faixa_etaria, raca, casos
                      - semana epidemiológica de INÍCIO DOS SINTOMAS (SEM_PRI); sem
                        hanseníase e LTA (o campo não existe nessas fichas)
   casos_municipio.parquet  doenca, definicao, ano, uf, municipio, casos
@@ -95,32 +95,34 @@ def gerar(pastas: Pastas, cfg: Config) -> None:
         GROUP BY ALL
         ORDER BY doenca, definicao, ano, uf, sexo, faixa_etaria, raca""", g / "casos.parquet")
 
-    # Série mensal: mês da notificação, com sexo e faixa etária (os filtros da
-    # série temporal do app).
+    # Série mensal: mês da notificação, com sexo, faixa etária e raça/cor (os
+    # filtros da série temporal do app).
     partes_mes = [p.replace("ano_notificacao AS ano, uf_res AS uf, sexo, faixa_etaria, raca",
-                            "CAST(date_trunc('month', dt_notific) AS DATE) AS mes, uf_res AS uf, sexo, faixa_etaria")
+                            "CAST(date_trunc('month', dt_notific) AS DATE) AS mes, uf_res AS uf, sexo, faixa_etaria, raca")
                   for p in partes]
     _copiar(con, f"""
-        SELECT doenca, definicao, mes, uf, sexo, faixa_etaria, CAST(count(*) AS INTEGER) AS casos
+        SELECT doenca, definicao, mes, uf, sexo, faixa_etaria, raca, CAST(count(*) AS INTEGER) AS casos
         FROM ({' UNION ALL '.join(partes_mes)})
         WHERE year(mes) BETWEEN {cfg.ano_inicio} AND {ano_max}
         GROUP BY ALL
-        ORDER BY doenca, definicao, mes, uf, sexo, faixa_etaria""", g / "casos_mes.parquet")
+        ORDER BY doenca, definicao, mes, uf, sexo, faixa_etaria, raca""", g / "casos_mes.parquet")
 
     # Curva epidêmica: casos por semana epidemiológica de início dos sintomas.
     # Semana 1 = a que contém 4 de janeiro (semanas de domingo a sábado), então
     # o início da semana é o domingo anterior (ou igual) a 4/jan + 7·(semana − 1).
+    # Com sexo, faixa etária e raça/cor, como a mensal (o app consulta este
+    # arquivo na hora, pelo DuckDB, em vez de carregá-lo na memória).
     partes_sem = [p.replace("ano_notificacao AS ano, uf_res AS uf, sexo, faixa_etaria, raca",
-                            "semana_sin_pri AS semana, uf_res AS uf") for p in partes]
+                            "semana_sin_pri AS semana, uf_res AS uf, sexo, faixa_etaria, raca") for p in partes]
     _copiar(con, f"""
         SELECT doenca, definicao, semana,
                CAST(make_date(semana // 100, 1, 4) - CAST(dayofweek(make_date(semana // 100, 1, 4)) AS INTEGER)
                     + 7 * (semana % 100 - 1) AS DATE) AS inicio_semana,
-               uf, CAST(count(*) AS INTEGER) AS casos
+               uf, sexo, faixa_etaria, raca, CAST(count(*) AS INTEGER) AS casos
         FROM ({' UNION ALL '.join(partes_sem)})
         WHERE semana // 100 BETWEEN {cfg.ano_inicio} AND {ano_max} AND semana % 100 BETWEEN 1 AND 53
         GROUP BY ALL
-        ORDER BY doenca, definicao, semana, uf""", g / "casos_semana.parquet")
+        ORDER BY doenca, definicao, semana, uf, sexo, faixa_etaria, raca""", g / "casos_semana.parquet")
 
     # Casos por município de residência (aba "Municípios" do app). O DF é um
     # município só (Brasília, 530010), mas o SINAN às vezes traz a região

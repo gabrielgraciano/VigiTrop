@@ -18,14 +18,30 @@ seletor_uf <- function(id, multiplo = FALSE, selecionado = BRASIL) {
 botao <- function(id) actionButton(id, "Atualizar gráfico", class = "btn-primary w-100")
 
 #Série temporal----
+# Uma aba só para as séries anual, mensal e semanal. UF e sexo viram linhas;
+# faixa etária e raça/cor são filtros (somam o que for escolhido).
 selecionar_doenca_serie_temporal <- seletor_doenca("doenca_st")
 selecionar_uf_st <- seletor_uf("uf_st", multiplo = TRUE)
 selecionar_sexo <- pickerInput("sexo", "Sexo", choices = SEXOS, selected = "Ambos", multiple = TRUE)
 selecionar_idade <- pickerInput("faixa_etaria", "Faixa etária",
                                 choices = c("Todas" = "Todos", stats::setNames(FAIXAS, FAIXAS)),
                                 selected = "Todos", multiple = TRUE)
-selecionar_periodicidade_st <- radioButtons("periodicidade_st", "Periodicidade", inline = TRUE,
-                                            choices = c("Anual" = "anual", "Mensal" = "mensal"))
+selecionar_raca_st <- pickerInput("raca_st", "Raça/cor", choices = c("Todas" = "Todas", stats::setNames(names(RACAS), RACAS)),
+                                  selected = "Todas", multiple = TRUE)
+selecionar_periodicidade_st <- radioButtons("periodicidade_st", "Periodicidade", inline = TRUE, choices = PERIODICIDADES)
+selecionar_periodo_st <- sliderInput("periodo_st", "Período", min = min(anos_disponiveis), max = max(anos_disponiveis),
+                                     value = range(anos_disponiveis), step = 1, sep = "")
+# Incidência só sem filtro de raça/cor (a população do IBGE não tem essa abertura)
+selecionar_metrica_st <- tagList(
+  conditionalPanel(
+    condition = "!input.raca_st || input.raca_st.indexOf('Todas') > -1",
+    radioButtons("metrica_st", "Mostrar", choices = c("Incidência" = "incidencia", "Casos absolutos" = "casos"))
+  ),
+  conditionalPanel(
+    condition = "input.raca_st && input.raca_st.indexOf('Todas') == -1",
+    tags$p(class = "form-text", "Com raça/cor escolhida, o gráfico mostra casos: a população do IBGE não tem raça/cor.")
+  )
+)
 botao_st <- botao("update_st")
 
 #Pirâmide etária----
@@ -44,14 +60,6 @@ selecionar_grafico_raca <- conditionalPanel(
   radioButtons("grafico_raca", "Gráfico", choices = c("Linhas" = "linhas", "Barras" = "barras"))
 )
 botao_ed <- botao("update_ed")
-
-#Série semanal----
-selecionar_doenca_sem <- seletor_doenca("doenca_sem", escolhas_doenca_semana)
-selecionar_uf_sem <- seletor_uf("uf_sem", multiplo = TRUE)
-selecionar_periodo_sem <- sliderInput("periodo_sem", "Período (ano da semana)", min = min(anos_disponiveis),
-                                      max = max(anos_disponiveis), value = c(max(anos_disponiveis) - 2, max(anos_disponiveis)),
-                                      step = 1, sep = "")
-botao_sem <- botao("update_sem")
 
 #Mapas----
 # Um mapa só, com o ranking das UFs ao lado; a escolha vale para os dois.

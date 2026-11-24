@@ -1,6 +1,8 @@
 # Dados do app: lidos UMA vez, na inicialização, do gold gerado pelo pipeline
-# (data/gold, ver pipeline/README.md). Sem MySQL e sem SQL montado com texto
-# vindo da interface: os filtros são feitos em memória, com valores validados.
+# (data/gold, ver pipeline/README.md). Sem MySQL. Os filtros são feitos em
+# memória, com valores validados; só as séries mensal e semanal, grandes demais
+# para a memória, são consultadas na hora pelo DuckDB, com SQL fixo e os valores
+# da interface (já validados) passados como parâmetros, nunca colados no texto.
 #
 # Regras do gold:
 #   - não existe linha "Brasil" nem faixa "Todos": o total é sempre a soma
@@ -36,17 +38,27 @@ casos$definicao <- NULL
 casos$uf <- as.integer(casos$uf)
 casos$ano <- as.integer(casos$ano)
 
-# Casos por mês de notificação (os 12 meses somam o ano de `casos`)
-casos_mes <- merge(ler_parquet("casos_mes.parquet"), padroes[, c("doenca", "definicao")], by = c("doenca", "definicao"))
-casos_mes$definicao <- NULL
-casos_mes$uf <- as.integer(casos_mes$uf)
-casos_mes$mes <- as.Date(casos_mes$mes)
-
-# Casos por semana epidemiológica de início dos sintomas (sem hanseníase e LTA)
-casos_semana <- merge(ler_parquet("casos_semana.parquet"), padroes[, c("doenca", "definicao")], by = c("doenca", "definicao"))
-casos_semana$definicao <- NULL
-casos_semana$uf <- as.integer(casos_semana$uf)
-casos_semana$inicio_semana <- as.Date(casos_semana$inicio_semana)
+# Séries mensal (mês de notificação) e semanal (semana de início dos sintomas;
+# sem hanseníase e LTA): com sexo, faixa e raça/cor, têm milhões de linhas, então
+# ficam no disco e o DuckDB consulta na hora (ver dados_serie). A conexão é do
+# processo R e dura enquanto ele vive.
+con_gold <- DBI::dbConnect(duckdb::duckdb())
+for (tabela in c("casos", "casos_mes", "casos_semana")) {
+  caminho <- normalizePath(file.path(dir_gold, paste0(tabela, ".parquet")), mustWork = TRUE)
+  DBI::dbExecute(con_gold, paste0("CREATE VIEW g_", tabela, " AS SELECT * FROM read_parquet(",
+                                  DBI::dbQuoteString(con_gold, caminho), ")"))
+}
+# Gold de antes da aba única não tem raça/cor (nem sexo e faixa na semanal): a aba avisa
+colunas <- function(tabela) DBI::dbGetQuery(con_gold, paste0("DESCRIBE g_", tabela))$column_name
+tem_series_completas <- "raca" %in% colunas("casos_mes") && all(c("sexo", "faixa_etaria", "raca") %in% colunas("casos_semana"))
+# Calendário das semanas epidemiológicas e último mês/semana com dados de cada doença
+semanas <- DBI::dbGetQuery(con_gold, "SELECT DISTINCT semana, inicio_semana FROM g_casos_semana ORDER BY semana")
+semanas$inicio_semana <- as.Date(semanas$inicio_semana)
+ultimos <- DBI::dbGetQuery(con_gold, "
+  SELECT m.doenca, m.ultimo_mes, s.ultima_semana
+  FROM (SELECT doenca, max(mes) AS ultimo_mes FROM g_casos_mes GROUP BY 1) m
+  LEFT JOIN (SELECT doenca, max(semana) AS ultima_semana FROM g_casos_semana GROUP BY 1) s USING (doenca)")
+ultimos$ultimo_mes <- as.Date(ultimos$ultimo_mes)
 
 populacao <- ler_parquet("populacao.parquet")
 populacao$uf <- as.integer(populacao$uf)
@@ -81,7 +93,7 @@ ufs <- ufs[order(ufs$NM_UF), ]
 
 escolhas_doenca <- stats::setNames(padroes$doenca, padroes$nome)
 escolhas_doenca <- escolhas_doenca[order(names(escolhas_doenca))]
-escolhas_doenca_semana <- escolhas_doenca[escolhas_doenca %in% unique(casos_semana$doenca)]
+doencas_com_semana <- ultimos$doenca[!is.na(ultimos$ultima_semana)]
 escolhas_uf <- stats::setNames(as.character(ufs$CD_UF), ufs$NM_UF)
 escolhas_uf_brasil <- c("Brasil" = BRASIL, escolhas_uf)
 # Raiva: tão poucos casos que a incidência por município não diz nada; a aba
@@ -116,15 +128,13 @@ somar_por_ano <- function(valores, anos_obs, anos) {
 # As taxas saem sem arredondar: o arredondamento é só na exibição (graficos.R),
 # senão 1 caso de raiva numa UF grande vira 0,00 e some do mapa.
 
-#' Incidência por 100 mil, anual ou mensal. `uf` = código IBGE ou "BR"; `sexo`
-#' = M, F ou "Ambos"; `faixas` = vetor de faixas ou "Todos". Brasil inclui casos
-#' com UF ignorada; "Ambos" inclui sexo ignorado; "Todos" inclui idade ignorada.
-#' Mensal: casos notificados no mês por 100 mil habitantes (população do ano).
-serie_incidencia <- function(doenca, uf, sexo, faixas, periodicidade = c("anual", "mensal")) {
-  periodicidade <- match.arg(periodicidade)
+#' Incidência anual por 100 mil (Brasil ou uma UF), usada na tendência e no mapa.
+#' `uf` = código IBGE ou "BR"; `sexo` = M, F ou "Ambos"; `faixas` = vetor de
+#' faixas ou "Todos". Brasil inclui casos com UF ignorada; "Ambos" inclui sexo
+#' ignorado; "Todos" inclui idade ignorada.
+serie_incidencia <- function(doenca, uf, sexo, faixas) {
   anos <- anos_da_doenca(doenca)
-  base <- if (periodicidade == "anual") casos else casos_mes
-  cs <- filtrar_uf(base[base$doenca == doenca, ], uf)
+  cs <- filtrar_uf(casos[casos$doenca == doenca, ], uf)
   ps <- filtrar_uf(populacao[populacao$ano %in% anos, ], uf)
   if (sexo != "Ambos") {
     cs <- cs[cs$sexo == sexo, ]
@@ -135,16 +145,68 @@ serie_incidencia <- function(doenca, uf, sexo, faixas, periodicidade = c("anual"
     ps <- ps[ps$faixa_etaria %in% faixas, ]
   }
   p <- somar_por_ano(ps$populacao, ps$ano, anos)
-  if (periodicidade == "anual") {
-    n <- somar_por_ano(cs$casos, cs$ano, anos)
-    return(data.frame(ano = anos, casos = n, populacao = p, incidencia = n / p * 1e5))
+  n <- somar_por_ano(cs$casos, cs$ano, anos)
+  data.frame(ano = anos, casos = n, populacao = p, incidencia = n / p * 1e5)
+}
+
+PERIODICIDADES <- c("Anual" = "anual", "Mensal" = "mensal", "Semanal" = "semanal")
+
+#' Uma linha da aba "Série temporal": casos e incidência de uma UF (ou Brasil) e
+#' um sexo (ou "Ambos"), somando as `faixas` e as `racas` escolhidas, entre os
+#' anos `de` e `ate`, na periodicidade pedida. Períodos sem caso entram com zero.
+#'   anual: ano de notificação; mensal: mês de notificação; semanal: semana
+#'   epidemiológica de início dos sintomas. A incidência usa a população do ano
+#'   (do ano da semana, na semanal). Com raça/cor filtrada, a incidência fica NA:
+#'   a projeção do IBGE não tem essa abertura.
+#' A consulta tem texto fixo; o que vem da interface entra como parâmetro (?).
+dados_serie <- function(doenca, periodicidade, uf, sexo, faixas, racas, de, ate) {
+  definicao <- padroes$definicao[padroes$doenca == doenca]
+  tempo <- c(anual = "ano", mensal = "mes", semanal = "semana")[[periodicidade]]
+  ano_de <- c(anual = "ano", mensal = "year(mes)", semanal = "semana // 100")[[periodicidade]]
+  onde <- c("doenca = ?", "definicao = ?", paste(ano_de, "BETWEEN ? AND ?"))
+  par <- list(doenca, definicao, as.integer(de), as.integer(ate))
+  em <- function(coluna, valores) {
+    onde <<- c(onde, paste0(coluna, " IN (", paste(rep("?", length(valores)), collapse = ", "), ")"))
+    par <<- c(par, as.list(valores))
   }
-  ultimo <- max(casos_mes$mes[casos_mes$doenca == doenca])
-  meses <- seq(as.Date(sprintf("%d-01-01", min(anos))), ultimo, by = "month")
-  n <- tapply(cs$casos, factor(as.character(cs$mes), levels = as.character(meses)), sum)
+  if (!identical(uf, BRASIL)) em("uf", as.integer(uf))
+  if (sexo != "Ambos") em("sexo", sexo)
+  if (!"Todos" %in% faixas) em("faixa_etaria", faixas)
+  if (!"Todas" %in% racas) em("raca", racas)
+  sql <- paste0("SELECT ", tempo, " AS t, sum(casos) AS casos FROM g_",
+                c(anual = "casos", mensal = "casos_mes", semanal = "casos_semana")[[periodicidade]],
+                " WHERE ", paste(onde, collapse = " AND "), " GROUP BY 1")
+  r <- DBI::dbGetQuery(con_gold, sql, params = unname(par))
+
+  # Grade completa de períodos: anos com arquivo, meses ou semanas até o último dado da doença
+  u <- ultimos[ultimos$doenca == doenca, ]
+  if (periodicidade == "anual") {
+    t <- anos_da_doenca(doenca)
+    t <- t[t >= de & t <= ate]
+    ano_t <- t
+  } else if (periodicidade == "mensal") {
+    inicio <- as.Date(sprintf("%d-01-01", de))
+    fim <- min(as.Date(sprintf("%d-12-01", ate)), u$ultimo_mes)
+    t <- if (inicio <= fim) seq(inicio, fim, by = "month") else as.Date(character())
+    ano_t <- as.integer(format(t, "%Y"))
+    r$t <- as.Date(r$t)
+  } else {
+    sem <- semanas[semanas$semana %/% 100 >= de & semanas$semana %/% 100 <= ate & semanas$semana <= u$ultima_semana, ]
+    t <- sem$semana
+    ano_t <- t %/% 100
+  }
+  n <- as.numeric(r$casos[match(as.character(t), as.character(r$t))])
   n[is.na(n)] <- 0
-  pop_mes <- p[match(as.integer(format(meses, "%Y")), anos)]
-  data.frame(mes = meses, casos = as.numeric(n), populacao = pop_mes, incidencia = as.numeric(n) / pop_mes * 1e5)
+
+  # População do ano de cada período (mesmos recortes, menos raça/cor)
+  ps <- filtrar_uf(populacao[populacao$ano %in% unique(ano_t), ], uf)
+  if (sexo != "Ambos") ps <- ps[ps$sexo == sexo, ]
+  if (!"Todos" %in% faixas) ps <- ps[ps$faixa_etaria %in% faixas, ]
+  p <- tapply(ps$populacao, ps$ano, sum)[as.character(ano_t)]
+  out <- data.frame(t = t, casos = n, populacao = as.numeric(p))
+  if (periodicidade == "semanal") out$inicio_semana <- sem$inicio_semana
+  out$incidencia <- if ("Todas" %in% racas) out$casos / out$populacao * 1e5 else NA_real_
+  out
 }
 
 #' Casos e incidência por UF num ano (para o mapa). Casos com UF ignorada ficam
@@ -178,20 +240,6 @@ dados_barras <- function(doenca, uf, por = c("sexo", "raca")) {
   tot <- ave(out$casos, out$ano, FUN = sum)
   out$porcentagem <- ifelse(tot > 0, 100 * out$casos / tot, NA_real_)
   out
-}
-
-#' Casos por semana epidemiológica de início dos sintomas, por UF (ou Brasil),
-#' entre os anos `de` e `ate`. Semanas sem caso entram com zero.
-dados_semana <- function(doenca, ufs_sel, de, ate) {
-  sel <- casos_semana[casos_semana$doenca == doenca & casos_semana$semana %/% 100 >= de & casos_semana$semana %/% 100 <= ate, ]
-  semanas <- sort(unique(casos_semana$inicio_semana[casos_semana$semana %/% 100 >= de & casos_semana$semana %/% 100 <= ate]))
-  saida <- lapply(ufs_sel, function(u) {
-    d <- filtrar_uf(sel, u)
-    n <- tapply(d$casos, factor(as.character(d$inicio_semana), levels = as.character(semanas)), sum)
-    n[is.na(n)] <- 0
-    data.frame(inicio_semana = semanas, casos = as.numeric(n), uf = nome_uf(u))
-  })
-  do.call(rbind, saida)
 }
 
 #' Casos por faixa etária e sexo (M/F) numa UF e ano. Idade ignorada volta em attr(, "sem_idade").

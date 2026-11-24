@@ -52,13 +52,13 @@ Opções:
 
 ## O gold (`data/gold/`)
 
-O app lê só estes arquivos, via DuckDB. Juntos ocupam cerca de 7 MB.
+O app lê só estes arquivos, via DuckDB. Juntos ocupam cerca de 19 MB; `casos_mes` e `casos_semana`, os maiores, são consultados na hora, sem ir para a memória do app.
 
 | Arquivo | Colunas |
 |---|---|
 | `casos.parquet` | `doenca`, `definicao`, `ano`, `uf`, `sexo`, `faixa_etaria`, `raca`, `casos` |
-| `casos_mes.parquet` | `doenca`, `definicao`, `mes` (dia 1), `uf`, `sexo`, `faixa_etaria`, `casos`: mês da data de notificação. Os 12 meses somam o ano de `casos.parquet`. |
-| `casos_semana.parquet` | `doenca`, `definicao`, `semana` (AAAASS), `inicio_semana`, `uf`, `casos`: semana epidemiológica de início dos sintomas. Hanseníase e LTA ficam de fora porque não têm o campo. |
+| `casos_mes.parquet` | `doenca`, `definicao`, `mes` (dia 1), `uf`, `sexo`, `faixa_etaria`, `raca`, `casos`: mês da data de notificação. Os 12 meses somam o ano de `casos.parquet`. |
+| `casos_semana.parquet` | `doenca`, `definicao`, `semana` (AAAASS), `inicio_semana`, `uf`, `sexo`, `faixa_etaria`, `raca`, `casos`: semana epidemiológica de início dos sintomas. Hanseníase e LTA ficam de fora porque não têm o campo. |
 | `casos_municipio.parquet` | `doenca`, `definicao`, `ano`, `uf`, `municipio`, `casos`: município de residência (código IBGE de 6 dígitos, como no SINAN). Sem as notificações com município ignorado (vazio ou `XX0000`); no DF, tudo em Brasília (`530010`), porque o SINAN às vezes traz a região administrativa (`5399xx`). |
 | `populacao.parquet` | `ano`, `uf`, `sexo`, `faixa_etaria`, `populacao` (2000-2070) |
 | `populacao_municipio.parquet` | `ano`, `uf`, `municipio`, `populacao`: ver [População dos municípios](#população-dos-municípios). |
