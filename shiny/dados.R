@@ -242,13 +242,18 @@ dados_barras <- function(doenca, uf, por = c("sexo", "raca")) {
   out
 }
 
-#' Casos por faixa etária e sexo (M/F) numa UF e ano. Idade ignorada volta em attr(, "sem_idade").
+#' Casos e incidência (taxa específica por idade e sexo, por 100 mil) por faixa
+#' etária e sexo (M/F) numa UF e ano. Idade ignorada volta em attr(, "sem_idade").
 dados_piramide <- function(doenca, uf, ano) {
   cs <- filtrar_uf(casos[casos$doenca == doenca & casos$ano == ano & casos$sexo %in% c("M", "F"), ], uf)
   out <- expand.grid(faixa_etaria = FAIXAS, sexo = c("M", "F"), stringsAsFactors = FALSE)
   s <- tapply(cs$casos, paste(cs$faixa_etaria, cs$sexo), sum)
   out$casos <- as.numeric(s[paste(out$faixa_etaria, out$sexo)])
   out$casos[is.na(out$casos)] <- 0
+  ps <- filtrar_uf(populacao[populacao$ano == ano, ], uf)
+  p <- tapply(ps$populacao, paste(ps$faixa_etaria, ps$sexo), sum)
+  out$populacao <- as.numeric(p[paste(out$faixa_etaria, out$sexo)])
+  out$incidencia <- out$casos / out$populacao * 1e5
   attr(out, "sem_idade") <- sum(cs$casos[cs$faixa_etaria == "Ignorado"])
   out
 }

@@ -55,6 +55,8 @@ VT.rotulosFinais = function () {
 VT.rotulosLados = function () {
   var chart = this;
   VT.limpar(chart);
+  // No celular a legenda fica ligada, no alto (as barras longas cobriam os nomes)
+  if (chart.legend && chart.legend.options.enabled) return;
   var y = chart.plotTop + 14;
   [[0, chart.plotLeft + 4, 'left'], [1, chart.plotLeft + chart.plotWidth - 4, 'right']].forEach(function (l) {
     var s = chart.series[l[0]];
@@ -71,7 +73,9 @@ VT.rotulosLados = function () {
 // com "mil" a partir de 1.000.
 VT.rotuloAbs = function () {
   var v = Math.abs(this.value);
-  if (v < 1000) return VT.num(v);
+  // Incidência pequena (0,5; 1,25...): as casas que o valor precisar, até 2
+  var casas = Math.abs(Math.round(v) - v) < 1e-9 ? 0 : (Math.abs(Math.round(v * 10) - v * 10) < 1e-9 ? 1 : 2);
+  if (v < 1000) return VT.num(v, casas);
   var k = v / 1000;
   return VT.num(k, k % 1 ? 1 : 0) + ' mil';
 };

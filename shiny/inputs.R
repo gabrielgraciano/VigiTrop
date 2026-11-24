@@ -48,6 +48,8 @@ botao_st <- botao("update_st")
 selecionar_doenca_piramide_etaria <- seletor_doenca("doenca_pe")
 selecionar_uf_pe <- seletor_uf("uf_pe")
 selecionar_ano_pe <- seletor_ano("ano_pe")
+# Incidência = taxa específica por idade e sexo (tira o efeito do tamanho de cada faixa)
+tipo_pe <- radioButtons("tipo_pe", "Mostrar", choices = c("Casos absolutos" = "casos", "Incidência" = "incidencia"))
 botao_pe <- botao("update_pe")
 
 #Sexo e raça/cor----

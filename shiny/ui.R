@@ -53,6 +53,7 @@ ui <- page_navbar(
                   selecionar_doenca_piramide_etaria,
                   selecionar_uf_pe,
                   selecionar_ano_pe,
+                  tipo_pe,
                   botao_pe
                 ),
                 conditionalPanel(
