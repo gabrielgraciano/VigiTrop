@@ -61,6 +61,12 @@ body { font-variant-numeric: lining-nums; }
 .vt-titulo { font-size: 18px; font-weight: 600; color: var(--vt-tinta); margin: 0; line-height: 1.3; }
 .vt-subtitulo { font-size: 14px; color: var(--vt-tinta-suave); margin: 4px 0 16px; }
 
+/* Aba Municípios: quadro do município buscado (mesma cor do contorno no mapa). */
+.vt-destaque-mun {
+  border-left: 3px solid #B45309; background: #FFF7ED; color: var(--vt-tinta);
+  font-size: 14px; line-height: 1.4; padding: 6px 10px; margin: -6px 0 10px;
+}
+
 /* Mapa sem fundo de ruas: só as UFs. */
 .vt-mapa .leaflet-container { background: #fff; font-family: inherit; }
 .vt-mapa .leaflet-control.vt-mapa-titulo {

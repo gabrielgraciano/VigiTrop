@@ -66,6 +66,11 @@ botao_map <- botao("update_map")
 selecionar_doenca_mun <- seletor_doenca("doenca_mun")
 selecionar_uf_mun <- pickerInput("uf_mun", "UF", choices = escolhas_uf, selected = "35",
                                  options = pickerOptions(liveSearch = TRUE, liveSearchPlaceholder = "Buscar UF"))
+# Busca de um município da UF (opcional): o mapa dá zoom nele e o ranking o mostra
+selecionar_municipio_mun <- pickerInput("municipio_mun", "Município (opcional)", choices = escolhas_municipio("35"),
+                                        selected = SEM_MUNICIPIO,
+                                        options = pickerOptions(liveSearch = TRUE, liveSearchNormalize = TRUE, size = 10,
+                                                                liveSearchPlaceholder = "Buscar município"))
 selecionar_periodo_mun <- sliderInput("periodo_mun", "Período", min = min(anos_disponiveis), max = max(anos_disponiveis),
                                       value = c(ano_padrao - 4, ano_padrao), step = 1, sep = "")
 tipo_mun <- conditionalPanel(

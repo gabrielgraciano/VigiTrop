@@ -145,6 +145,12 @@ server <- function(input, output, session) {
   })
 
   #Municípios----
+  # A lista de municípios acompanha a UF escolhida (e volta para "Nenhum")
+  observeEvent(input$uf_mun, {
+    uf <- validar(input$uf_mun, escolhas_uf)
+    updatePickerInput(session, "municipio_mun", choices = escolhas_municipio(uf), selected = SEM_MUNICIPIO)
+  }, ignoreInit = TRUE)
+
   municipal <- eventReactive(input$update_mun, {
     validate(need(tem_municipios, "Os dados por município ainda não chegaram: falta atualizar o gold."))
     doenca <- validar(input$doenca_mun, escolhas_doenca)
@@ -153,20 +159,24 @@ server <- function(input, output, session) {
     anos <- intersect(seq(min(periodo), max(periodo)), anos_da_doenca(doenca))
     validate(need(length(anos) > 0, "Não há dados dessa doença no período escolhido."))
     por <- if (doenca %in% DOENCAS_SO_CASOS) "casos" else validar(input$tipo_mun, c("incidencia", "casos"))
-    list(doenca = doenca, uf = uf, anos = anos, por = por, dados = dados_municipios(doenca, uf, anos))
+    # Município buscado: só vale se for da UF escolhida (logo depois de trocar a
+    # UF, a lista do campo ainda pode ser a da UF anterior)
+    mun <- input$municipio_mun
+    mun <- if (length(mun) == 1 && mun %in% malha_municipios(uf)$municipio) mun else NULL
+    list(doenca = doenca, uf = uf, anos = anos, por = por, municipio = mun, dados = dados_municipios(doenca, uf, anos))
   }, ignoreNULL = FALSE)
 
   output$mun_titulo <- renderUI({
     r <- municipal()
-    titulo_municipios(r$dados, r$doenca, r$uf, r$anos, r$por)
+    titulo_municipios(r$dados, r$doenca, r$uf, r$anos, r$por, r$municipio)
   })
   output$mapa_mun <- renderLeaflet({
     r <- municipal()
-    grafico_mapa_mun(r$dados, r$doenca, r$uf, r$anos, r$por)
+    grafico_mapa_mun(r$dados, r$doenca, r$uf, r$anos, r$por, r$municipio)
   })
   output$ranking_mun <- renderHighchart({
     r <- municipal()
-    grafico_ranking_mun(r$dados, r$doenca, r$uf, r$anos, r$por)
+    grafico_ranking_mun(r$dados, r$doenca, r$uf, r$anos, r$por, r$municipio)
   })
   output$nota_mun <- renderUI({
     r <- municipal()

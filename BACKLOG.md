@@ -26,6 +26,7 @@ A pesquisa completa sobre as definições (08/11/2026) está em [`docs/investiga
 - **Aba "Municípios" (23/11/2026):** mapa dos municípios de uma UF, com o ranking dos 20 maiores ao lado, como na aba "Mapas".
   - Casos pelo município de residência (`ID_MN_RESI`, preenchido em mais de 99,5% das notificações). No DF, tudo em Brasília (o SINAN às vezes traz a região administrativa, `5399xx`).
   - População dos municípios: Contagem 2007, Censos 2010 e 2022 e estimativas pós-2022 do IBGE, interpoladas nos anos entre elas e ajustadas à projeção da UF (detalhes no `pipeline/README.md`). Malha: IBGE 2025, simplificada (`pipeline/scripts/gerar_mapas_municipios.py`).
+  - Busca por município (24/11/2026): campo opcional com os municípios da UF escolhida. O mapa dá zoom nele com o contorno destacado, um quadro mostra casos, incidência, população e a posição entre os municípios da UF, e o ranking o acrescenta no fim se ele não estiver entre os 20.
   - O padrão soma 5 anos (incidência média anual): num ano só, a taxa dos municípios pequenos oscila muito (em 2024, 399 dos 639 municípios com LV tiveram 1 caso). Raiva só com casos absolutos.
   - Pendente: taxa suavizada (Bayes empírico), se a oscilação nos municípios pequenos atrapalhar a leitura.
 - **Acessos por celular (21/11/2026):** o app não terá contador de acessos nem serviço de estatística externo. A versão para celular se ajusta sozinha pela largura da tela.

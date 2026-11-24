@@ -234,6 +234,15 @@ malha_municipios <- function(uf) {
   malhas_municipios[[sigla]]
 }
 
+# Campo "Município" da aba: os municípios da UF em ordem alfabética (sem
+# contar acentos), com "Nenhum" primeiro.
+SEM_MUNICIPIO <- "nenhum"
+escolhas_municipio <- function(uf) {
+  m <- sf::st_drop_geometry(malha_municipios(uf))
+  m <- m[order(iconv(m$nome, "UTF-8", "ASCII//TRANSLIT"), m$nome), ]
+  c("Nenhum" = SEM_MUNICIPIO, stats::setNames(m$municipio, m$nome))
+}
+
 #' Casos e incidência por município de uma UF, somando os anos `anos`. A
 #' incidência do período é a média anual: casos / soma das populações dos anos
 #' (pessoas-ano) × 100 mil. Casos sem município identificado ficam fora do

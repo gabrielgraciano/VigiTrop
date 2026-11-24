@@ -23,6 +23,7 @@ ui <- page_navbar(
                   condition = "input.navset == 'Municípios'",
                   selecionar_doenca_mun,
                   selecionar_uf_mun,
+                  selecionar_municipio_mun,
                   selecionar_periodo_mun,
                   tipo_mun,
                   botao_mun
