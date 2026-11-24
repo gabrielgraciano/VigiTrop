@@ -30,11 +30,7 @@ cards <- list(
     highchartOutput("calor_uf", height = "700px"),
     card_footer(uiOutput("nota_br"))
   ),
-  card(
-    full_screen = TRUE,
-    highchartOutput("serie_semanal", height = "480px"),
-    card_footer(uiOutput("nota_sem"))
-  ),
+  NULL,  # era a "Série semanal", que entrou na "Série temporal"
   card(
     full_screen = TRUE,
     layout_columns(

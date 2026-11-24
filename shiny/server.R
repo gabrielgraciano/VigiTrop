@@ -28,32 +28,54 @@ server <- function(input, output, session) {
   })
 
   #Série temporal----
+  # Anual, mensal ou semanal numa aba só. Cada UF × sexo escolhido vira uma linha;
+  # faixa etária e raça/cor filtram (somam o que foi escolhido).
   serie <- eventReactive(input$update_st, {
+    validate(need(tem_series_completas, "As séries com raça/cor ainda não chegaram: falta atualizar o gold."))
     doenca <- validar(input$doenca_st, escolhas_doenca)
     ufs_sel <- validar(input$uf_st, escolhas_uf_brasil)
     sexos <- validar(input$sexo, SEXOS)
     faixas <- validar(input$faixa_etaria, c("Todos", FAIXAS))
-    periodicidade <- validar(input$periodicidade_st, c("anual", "mensal"))
+    racas <- validar(input$raca_st, c("Todas", names(RACAS)))
+    periodicidade <- validar(input$periodicidade_st, PERIODICIDADES)
+    periodo <- as.integer(validar(input$periodo_st, anos_disponiveis))
+    validate(need(periodicidade != "semanal" || doenca %in% doencas_com_semana,
+                  "Hanseníase e leishmaniose tegumentar não têm a semana de início dos sintomas. Escolha a série mensal ou anual."))
+    # Com raça/cor filtrada só há casos (sem população por raça/cor)
+    metrica <- if ("Todas" %in% racas) validar(input$metrica_st, c("incidencia", "casos")) else "casos"
     linhas <- list()
     for (u in ufs_sel) for (s in sexos) {
-      d <- serie_incidencia(doenca, u, s, faixas, periodicidade)
+      d <- dados_serie(doenca, periodicidade, u, s, faixas, racas, min(periodo), max(periodo))
+      if (!nrow(d)) next
       # O nome vai escrito no fim da linha: só a UF, e o sexo quando ele varia
       d$serie <- if (length(sexos) > 1 || s != "Ambos") paste(nome_uf(u), rotulo_sexo(s), sep = " · ") else nome_uf(u)
       linhas[[length(linhas) + 1]] <- d
     }
-    detalhe <- if (!"Todos" %in% faixas) paste("Faixas etárias:", paste(faixas, collapse = ", "))
-    list(doenca = doenca, periodicidade = periodicidade, dados = do.call(rbind, linhas), detalhe = detalhe)
+    validate(need(length(linhas) > 0, "Não há dados dessa doença no período escolhido."))
+    dados <- do.call(rbind, linhas)
+    detalhe <- c(if (!"Todos" %in% faixas) paste("Faixas etárias:", paste(faixas, collapse = ", ")),
+                 if (!"Todas" %in% racas) paste("Raça/cor:", paste(RACAS[racas], collapse = ", ")))
+    list(doenca = doenca, periodicidade = periodicidade, metrica = metrica, dados = dados, por_raca = !"Todas" %in% racas,
+         detalhe = if (length(detalhe)) paste(detalhe, collapse = ". "))
   }, ignoreNULL = FALSE)
 
   output$monthplot <- renderHighchart({
     r <- serie()
-    grafico_serie(r$dados, r$doenca, r$periodicidade == "mensal", r$detalhe)
+    grafico_serie(r$dados, r$doenca, r$periodicidade, r$metrica, r$detalhe)
   })
   output$nota_st <- renderUI({
     r <- serie()
-    nota_doenca(r$doenca, if (r$periodicidade == "mensal") paste(
-      "Mensal: casos notificados no mês (data de notificação) por 100 mil habitantes, com a população do ano.",
-      "Os 12 meses somam a incidência anual."))
+    nota_doenca(r$doenca, c(
+      switch(r$periodicidade,
+             anual = "Anual: ano de notificação.",
+             mensal = "Mensal: mês da data de notificação; os 12 meses somam o ano.",
+             semanal = paste("Semanal: semana epidemiológica de início dos sintomas (domingo a sábado), não a data de notificação;",
+                             "os totais podem diferir um pouco das outras séries. As semanas mais recentes ficam incompletas",
+                             "até as notificações serem digitadas.")),
+      if (r$metrica == "incidencia" && r$periodicidade != "anual") "A incidência usa a população do ano.",
+      if (r$por_raca) "Por raça/cor só há casos: a projeção do IBGE não tem população por raça/cor.",
+      "Casos com sexo, faixa etária ou raça/cor ignorados só entram quando a opção é \"Ambos\" ou \"Todas\"."
+    ))
   })
 
   #Pirâmide etária----
@@ -96,24 +118,6 @@ server <- function(input, output, session) {
     nota_doenca(r$doenca, if (r$por == "sexo") "Casos com sexo ignorado não entram na porcentagem."
                 else "Raça/cor ignorada ou em branco entra como \"Ignorada\". Sem incidência por raça/cor: a projeção do IBGE não tem essa abertura.")
   })
-
-  #Série semanal----
-  semanal <- eventReactive(input$update_sem, {
-    doenca <- validar(input$doenca_sem, escolhas_doenca_semana)
-    ufs_sel <- validar(input$uf_sem, escolhas_uf_brasil)
-    periodo <- as.integer(validar(input$periodo_sem, anos_disponiveis))
-    list(doenca = doenca, dados = dados_semana(doenca, ufs_sel, min(periodo), max(periodo)))
-  }, ignoreNULL = FALSE)
-
-  output$serie_semanal <- renderHighchart({
-    r <- semanal()
-    validate(need(nrow(r$dados) > 0, "Não há semanas nesse período."))
-    grafico_semanal(r$dados, r$doenca)
-  })
-  output$nota_sem <- renderUI(nota_doenca(semanal()$doenca, paste(
-    "Semana epidemiológica de início dos sintomas (domingo a sábado), não ano de notificação: os totais",
-    "podem diferir um pouco das outras abas. As semanas mais recentes ficam incompletas até as notificações",
-    "serem digitadas. Hanseníase e leishmaniose tegumentar não têm esse campo.")))
 
   #Mapas----
   mapa <- eventReactive(input$update_map, {
